@@ -1,0 +1,64 @@
+# Fork-friendly build: same toolchain/steps as build.yml, but no SSH keys
+# and no deploy. Every target is uploaded as a downloadable artifact.
+# Runs on pushes to any branch except master (so master can mirror
+# upstream untouched) and on manual dispatch.
+name: Fork build
+
+on:
+  push:
+    branches-ignore: [ master ]
+  workflow_dispatch:
+
+concurrency:
+  group: fork-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { cpu_target: "000",   artifact: freemint-cpu-000 }
+          - { cpu_target: "02060", artifact: freemint-cpu-02060 }
+          - { cpu_target: col,     artifact: freemint-cpu-coldfire }
+          - { cpu_target: deb,     artifact: freemint-cpu-debug }
+          - { cpu_target: prg,     artifact: usb4tos }
+          - { cpu_target: ste,     artifact: freemint-st_ste }
+          - { cpu_target: tt,      artifact: freemint-tt_falcon_clones }
+          - { cpu_target: firebee, artifact: freemint-firebee }
+          - { cpu_target: ara,     artifact: freemint-aranym }
+    env:
+      CROSS_TOOL: m68k-atari-mint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Setup environment
+        env:
+          CPU_TARGET: ${{ matrix.cpu_target }}
+        run: ./.scripts/setup_env.sh
+      - name: Install packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SYSROOT_DIR="/" ./.scripts/install-freemint.sh binutils gcc mintbin
+          ./.scripts/install-freemint.sh mintlib fdlibm gemlib cflib gemma
+          ./.scripts/install-hcp.sh
+          ./.scripts/install-udo.sh
+          ./.scripts/install-release.sh dosfstools e2fsprogs
+      - name: Install Applications
+        run: ./.scripts/install-apps.sh
+      - name: libcmini
+        run: ./.scripts/install-libcmini.sh
+      - name: build
+        run: |
+          ./.scripts/before_script.sh
+          ./.scripts/build.sh
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: /tmp/freemint-deploy
+          retention-days: 30
