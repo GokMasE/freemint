@@ -87,7 +87,7 @@ jobs:
       - name: Run tests
         run: |
           ls -l snapshot
-          HATARI_WORK="$PWD/hatari-out" ./tests/hatari/run-tests.sh "$(ls snapshot/*.zip | head -1)"
+          DUMP_SHOTS=1 HATARI_WORK="$PWD/hatari-out" ./tests/hatari/run-tests.sh "$(ls snapshot/*.zip | head -1)"
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v6

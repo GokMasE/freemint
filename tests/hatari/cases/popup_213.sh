@@ -2,9 +2,15 @@
 # left, move onto an entry, release right. The entry must be selected
 # once, the popup must not reopen and no phantom button events may
 # follow.
-X=320; Y=220	# inside poptest's work area
+X=320; Y=220	# inside poptest's work area (160,120 320x200)
+WORK_TITLE_Y=110	# poptest's title bar
 mark=$(prog_log POPTEST | wc -l)
 new_log() { prog_log POPTEST | tail -n +$((mark + 1)); }
+
+# Top the test window first (click its title bar): a click into an
+# untopped XaAES window only tops it and is not passed to the app.
+mouse_move $X $((WORK_TITLE_Y)); mouse_click 1; sleep 1
+emu_shot topped
 
 mouse_move $X $Y
 mouse_down 1
