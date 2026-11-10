@@ -62,3 +62,39 @@ jobs:
           name: ${{ matrix.artifact }}
           path: /tmp/freemint-deploy
           retention-days: 30
+
+  # Boots the TT/Falcon snapshot in Hatari (Falcon 030, EmuTOS, IDE disk)
+  # and runs the XaAES input tests in tests/hatari. See tests/hatari/README.md.
+  hatari-test:
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      CROSS_TOOL: m68k-atari-mint
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install cross compiler (for the test app)
+        run: |
+          SYSROOT_DIR="/" ./.scripts/install-freemint.sh binutils gcc mintbin
+          ./.scripts/install-freemint.sh mintlib gemlib
+      - name: Build test app
+        run: make -C tests/hatari/poptest
+      - name: Install Hatari and EmuTOS
+        run: ./tests/hatari/setup.sh
+      - uses: actions/download-artifact@v6
+        with:
+          name: freemint-tt_falcon_clones
+          path: snapshot
+      - name: Run tests
+        run: |
+          ls -l snapshot
+          HATARI_WORK="$PWD/hatari-out" ./tests/hatari/run-tests.sh "$(ls snapshot/*.zip | head -1)"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: hatari-test-results
+          path: |
+            hatari-out/shots
+            hatari-out/hatari.log
+            hatari-out/results.txt
+          retention-days: 30
