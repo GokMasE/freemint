@@ -386,6 +386,8 @@ timer_handler(void)
 						else
 						{
 						/* NEW PACKET */
+							register unsigned short ls = last_state;
+
 							click_state	= s;
 							click_cstate	= s;
 							last_state	= s;
@@ -397,6 +399,15 @@ timer_handler(void)
 							{
 								last_time	= tm;
 								timeout		= dc_time;
+
+								/* Count only newly pressed buttons; one already
+								 * held from the previous packet is not a new click
+								 * (avoids a phantom double-click, bug #213).
+								 * If nothing new was pressed (a button was released
+								 * while others stay held), keep the old behaviour so
+								 * the packet never carries clicks == 0. */
+								if (s & ~ls)
+									s &= ~ls;
 
 								for (i = 0; i < 16; i++)
 								{
