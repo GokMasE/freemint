@@ -50,9 +50,7 @@ emu_wait '^POPTEST: DONE' 20 || true
 echo "--- program log"
 prog_log POPTEST
 if [ "$fail" != 0 ] && [ -n "${DUMP_SHOTS:-}" ]; then
-	# Screenshots as base64 in the log, for when artifacts can't be fetched.
-	for f in "$HATARI_WORK"/shots/*.png; do
-		echo "SHOT $(basename "$f") $(base64 -w0 "$f")"
-	done
+	# Screenshots as text in the log, for when artifacts can't be fetched.
+	python3 "$HERE/png2txt.py" "$HATARI_WORK"/shots/*.png
 fi
 exit $fail

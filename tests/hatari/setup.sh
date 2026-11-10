@@ -13,7 +13,7 @@ done
 if [ -n "$need" ]; then
 	$SUDO apt-get update -q
 	$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-		hatari xvfb xdotool mtools dosfstools fdisk unzip
+		hatari xvfb xdotool mtools dosfstools fdisk unzip python3-pil
 fi
 
 mkdir -p "$HATARI_CACHE"
