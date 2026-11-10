@@ -18,6 +18,8 @@ emu_cmd "hatari-event doubleclick"; sleep 1.5
 new_log
 mouse_click 1; sleep 1.5
 new_log
+key Escape; sleep 1
+mark=$(prog_log POPTEST | wc -l)
 
 mouse_move $X $Y
 mouse_down 1
