@@ -784,8 +784,17 @@ chk_button_waiter(struct moose_data *md)
 	{
 		if (C.button_waiter->status & CS_MENU_NAV)
 		{
-			add_client_md(C.button_waiter, md);
-			C.button_waiter = NULL;
+			/*
+			 * Presses during menu navigation belong to the menu.
+			 * Only the final all-buttons-up packet ends the app's
+			 * click-hold. Queueing a press here made the app reopen
+			 * the popup and see a stuck button state (bug #213).
+			 */
+			if (!md->cstate)
+			{
+				add_client_md(C.button_waiter, md);
+				C.button_waiter = NULL;
+			}
 		}
 		else
 		{
