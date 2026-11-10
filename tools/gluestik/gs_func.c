@@ -281,6 +281,7 @@ gs_accept (int fd)
 	if ((ret = getsockname (in_fd, (struct sockaddr *) &addr2, &addr_size)) < 0)
 	{
 		DEBUG (("gs_accept: getsockname() returns %li (%i)", ret, errno));
+		Fclose (in_fd);
 		return gs_xlate_error (errno, "gs_accept");
 	}
 	
@@ -398,6 +399,7 @@ gs_connect (int fd, uint32 rhost, int16 rport, uint32 lhost, int16 lport)
 	if (retval < 0)
 	{
 		DEBUG (("gs_connect: bind() returns %i (%i)", retval, errno));
+		Fclose (sock_fd);
 		return gs_xlate_error (errno, "gs_connect");
 	}
 	
@@ -407,6 +409,7 @@ gs_connect (int fd, uint32 rhost, int16 rport, uint32 lhost, int16 lport)
 		if (retval < 0)
 		{
 			DEBUG (("gs_connect: listen() returns %i (%i)", retval, errno));
+			Fclose (sock_fd);
 			return gs_xlate_error (errno, "gs_connect");
 		}
 	}
@@ -423,6 +426,7 @@ gs_connect (int fd, uint32 rhost, int16 rport, uint32 lhost, int16 lport)
 		if (retval < 0)
 		{
 			DEBUG (("gs_connect: connect() returns %i (%i)", retval, errno));
+			Fclose (sock_fd);
 			return gs_xlate_error (errno, "gs_connect");
 		}
 	}
@@ -436,6 +440,7 @@ gs_connect (int fd, uint32 rhost, int16 rport, uint32 lhost, int16 lport)
 	if (retval < 0)
 	{
 		DEBUG (("gs_connect: getsockname() returns %i (%i)", retval, errno));
+		Fclose (sock_fd);
 		return gs_xlate_error (errno, "gs_connect");
 	}
 	
@@ -525,6 +530,7 @@ gs_udp_open (int fd, uint32 rhost, int16 rport)
 	{
 		int err = errno;
 		DEBUG (("gs_udp_open: connect() returns %i (%i)", retval, err));
+		Fclose (sock_fd);
 		return gs_xlate_error (err, "gs_udp_open");
 	}
 	
@@ -536,6 +542,7 @@ gs_udp_open (int fd, uint32 rhost, int16 rport)
 	if (retval < 0)
 	{
 		DEBUG (("gs_udp_open: getsockame() returns %i (%i)", retval, errno));
+		Fclose (sock_fd);
 		return gs_xlate_error (errno, "gs_udp_open");
 	}
 	
