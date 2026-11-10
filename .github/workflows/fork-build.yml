@@ -32,7 +32,7 @@ jobs:
     env:
       CROSS_TOOL: m68k-atari-mint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Setup environment
@@ -57,7 +57,7 @@ jobs:
           ./.scripts/before_script.sh
           ./.scripts/build.sh
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
           path: /tmp/freemint-deploy
