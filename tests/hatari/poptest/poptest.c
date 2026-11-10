@@ -134,7 +134,7 @@ int main(void)
 		ev = evnt_multi(MU_BUTTON | MU_KEYBD | MU_MESAG | MU_TIMER,
 				2, 1, 1,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-				msg, 500L,
+				msg, 100L,
 				&mx, &my, &bs, &ks, &key, &clicks);
 
 		if (ev & MU_MESAG)

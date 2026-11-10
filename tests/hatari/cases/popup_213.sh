@@ -12,6 +12,13 @@ new_log() { prog_log POPTEST | tail -n +$((mark + 1)); }
 mouse_move $X $((WORK_TITLE_Y)); mouse_click 1; sleep 1
 emu_shot topped
 
+# Diagnostics: Hatari's own injected double click, then a plain click.
+mouse_move $X $Y
+emu_cmd "hatari-event doubleclick"; sleep 1.5
+new_log
+mouse_click 1; sleep 1.5
+new_log
+
 mouse_move $X $Y
 mouse_down 1
 emu_wait '^POPTEST: POPUP_OPEN' 10 || return 1

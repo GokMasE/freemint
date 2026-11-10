@@ -50,6 +50,12 @@ emu_wait '^POPTEST: DONE' 20 || true
 echo "--- program log"
 prog_log POPTEST
 if [ "$fail" != 0 ] && [ -n "${DUMP_SHOTS:-}" ]; then
+	echo "--- hatari.log (non-program lines, tail)"
+	grep -av '^POPTEST: ' "$HATARI_WORK/hatari.log" | tail -30
+	emu_stop
+	echo "--- XaAES boot log"
+	log="$(mdir -/ -b -i "$HATARI_WORK/disk.img@@1M" ::/mint 2>/dev/null | grep -i 'xa_boot.log' | head -1)"
+	[ -n "$log" ] && mtype -i "$HATARI_WORK/disk.img@@1M" "$log" | tr -d '\r' | tail -60
 	# Screenshots as text in the log, for when artifacts can't be fetched.
 	python3 "$HERE/png2txt.py" "$HATARI_WORK"/shots/*.png
 fi
