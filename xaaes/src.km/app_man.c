@@ -845,6 +845,31 @@ unblock_reiconify_timeout(void)
 	rpi_block--;
 }
 
+/*
+ * Find the app that should get focus when 'client' is hidden: the first
+ * eligible app in the app list (which is kept in topping order) after
+ * 'client' itself, i.e. the previously topped app. next_app() walks the
+ * list from the end, which would bring the least recently used app to front.
+ */
+static bool any_window(int lock, struct xa_client *client);
+
+static struct xa_client *
+hide_next_app(int lock, struct xa_client *client)
+{
+	struct xa_client *c;
+
+	for (c = APP_LIST_START; c; c = NEXT_APP(c))
+	{
+		if (c == client || (c->type & (APP_SYSTEM | APP_ACCESSORY)))
+			continue;
+		if (c->std_menu || c->nxt_menu ||
+		    c->waiting_for & (MU_KEYBD | MU_NORM_KEYBD) ||
+		    any_window(lock, c))
+			return c;
+	}
+	return NULL;
+}
+
 void
 hide_app(int lock, struct xa_client *client)
 {
@@ -855,9 +880,9 @@ hide_app(int lock, struct xa_client *client)
 	DIAG((D_appl, NULL, "hide_app for %s", c_owner(client) ));
 	DIAG((D_appl, NULL, "   focus is  %s", c_owner(infocus) ));
 
-	nxtclient = next_app(lock, true, true);
+	nxtclient = hide_next_app(lock, client);
 	if ((client->type & APP_SYSTEM) ||
-	    (!nxtclient || nxtclient == client) ||
+	    !nxtclient ||
 	    (client->swm_newmsg & NM_INHIBIT_HIDE))
 		return;
 
