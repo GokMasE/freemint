@@ -954,7 +954,7 @@ short flags)
 
 		bool hidden;
 
-		if (ob_parent_origin(wt->tree, aesobj_item(&item), &px, &py, &hidden))
+		if (ob_parent_origin(wt->tree, aesobj_item(&item), &px, &py, &hidden, NULL))
 		{
 			/* a hidden ancestor: the walk would never reach item */
 			if (hidden)

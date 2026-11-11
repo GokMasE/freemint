@@ -1454,6 +1454,21 @@ ob_get_parent(OBJECT *tree, struct xa_aes_object obj)
 	if (!aesobj_item(&obj))
 		return inv_aesobj();
 
+	/*
+	 * Climb straight to the parent instead of walking the tree from the
+	 * root with a kmalloc()ed stack entry per level. Only when the walk
+	 * would give the same answer: it doesn't descend into hidden
+	 * subtrees, and treats links specially, so those keep the walk.
+	 */
+	if (aesobj_tree(&obj) == tree)
+	{
+		short px, py, par;
+		bool hidden;
+
+		if (ob_parent_origin(tree, aesobj_item(&obj), &px, &py, &hidden, &par) && !hidden)
+			return aesobj(tree, par);
+	}
+
 	curr = aesobj(tree, 0);
 	stop = inv_aesobj();
 
@@ -2590,7 +2605,8 @@ clean_aesobj_links(struct oblink_spec **oblink)
  * ancestors' positions: *px/*py is the origin of item's parent relative
  * to the tree origin (root's ob_x/ob_y included), which is what a full
  * walk from the root would have accumulated on reaching 'item'.
- * *hidden is set if any ancestor has OF_HIDETREE.
+ * *hidden is set if any ancestor has OF_HIDETREE; *parent (if not NULL)
+ * gets item's parent.
  *
  * Returns false when the answer could differ from a full walk, so the
  * caller must walk: item is not in the tree (an object before it carries
@@ -2598,9 +2614,9 @@ clean_aesobj_links(struct oblink_spec **oblink)
  * replaces its own children during the walk).
  */
 bool
-ob_parent_origin(OBJECT *tree, short item, short *px, short *py, bool *hidden)
+ob_parent_origin(OBJECT *tree, short item, short *px, short *py, bool *hidden, short *parent)
 {
-	short o, n, x = 0, y = 0, guard = 0;
+	short o, n, x = 0, y = 0, guard = 0, par = -1;
 	bool hid = false;
 
 	if (item <= 0)
@@ -2634,6 +2650,8 @@ ob_parent_origin(OBJECT *tree, short item, short *px, short *py, bool *hidden)
 				return false;
 
 		o = n;
+		if (par < 0)
+			par = o;
 
 		if ((tree[o].ob_type & 0xff) == G_OBLINK)
 			return false;
@@ -2647,6 +2665,8 @@ ob_parent_origin(OBJECT *tree, short item, short *px, short *py, bool *hidden)
 	*px = x;
 	*py = y;
 	*hidden = hid;
+	if (parent)
+		*parent = par;
 	return true;
 }
 
@@ -2674,7 +2694,7 @@ obj_offset(XA_TREE *wt, struct xa_aes_object object, short *mx, short *my)
 		bool hidden;
 
 		/* this walk ignores OF_HIDETREE, so hidden doesn't matter */
-		if (ob_parent_origin(obtree, aesobj_item(&object), &px, &py, &hidden))
+		if (ob_parent_origin(obtree, aesobj_item(&object), &px, &py, &hidden, NULL))
 		{
 			*mx = x + px + aesobj_getx(&object);
 			*my = y + py + aesobj_gety(&object);
@@ -2767,7 +2787,7 @@ ob_offset(OBJECT *obtree, struct xa_aes_object object, short *mx, short *my)
 		bool hidden;
 
 		/* this walk ignores OF_HIDETREE, so hidden doesn't matter */
-		if (ob_parent_origin(obtree, aesobj_item(&object), &px, &py, &hidden))
+		if (ob_parent_origin(obtree, aesobj_item(&object), &px, &py, &hidden, NULL))
 		{
 			*mx = px + aesobj_getx(&object);
 			*my = py + aesobj_gety(&object);
