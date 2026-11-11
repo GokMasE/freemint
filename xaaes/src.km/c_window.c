@@ -954,6 +954,57 @@ setwin_ontop(int lock, struct xa_window *wind, bool snd_ontop)
 	}
 }
 
+/*
+ * Frame redraws (xaw 0) queued for the same window overlap a lot: topping a
+ * window queues the newly exposed rectangles and then a redraw of the whole
+ * frame, and focus changes queue whole-frame redraws for both windows. All
+ * of them paint the state at the time they run, so a new one that is
+ * already covered by a queued one is dropped. A new whole-frame redraw
+ * takes the place of the first queued partial one, and the other partial
+ * ones are removed. Returns true when nothing more needs to be queued.
+ */
+static bool
+merge_frame_iredraw(struct xa_window *wind, const GRECT *r)
+{
+	struct xa_aesmsg_list **next, *msg, *first = NULL;
+
+	for (msg = wind->owner->irdrw_msg; msg; msg = msg->next)
+	{
+		GRECT *o;
+
+		if (msg->message.irdrw.ptr != wind || msg->message.irdrw.xaw)
+			continue;
+
+		o = &msg->message.irdrw.rect;
+		if (!(o->g_w || o->g_h))
+			return true;
+		if (r && is_inside(r, o))
+			return true;
+		if (!first)
+			first = msg;
+	}
+
+	if (r || !first)
+		return false;
+
+	first->message.irdrw.rect.g_x = first->message.irdrw.rect.g_y = 0;
+	first->message.irdrw.rect.g_w = first->message.irdrw.rect.g_h = 0;
+
+	next = &first->next;
+	while ((msg = *next))
+	{
+		if (msg->message.irdrw.ptr == wind && !msg->message.irdrw.xaw)
+		{
+			*next = msg->next;
+			kfree(msg);
+			kick_mousemove_timeout();
+		}
+		else
+			next = &msg->next;
+	}
+	return true;
+}
+
 void
 send_iredraw(int lock, struct xa_window *wind, short xaw, GRECT *r)
 {
@@ -973,6 +1024,8 @@ send_iredraw(int lock, struct xa_window *wind, short xaw, GRECT *r)
 	}
 	else
 	{
+		if (!xaw && merge_frame_iredraw(wind, r))
+			return;
 		if (r)
 		{
  			if (!is_inside(r, &wind->rwa))
@@ -1025,6 +1078,35 @@ generate_redraws(int lock, struct xa_window *wind, GRECT *r, short flags)
 	}
 	DIAGS(("generate_redraws: !"));
 }
+/*
+ * True if a frame redraw (xaw 0) for the window is still waiting in the
+ * owner's internal redraw queue and will paint 'area': either it covers the
+ * whole frame (empty rect, as queued by generate_redraws(.., NULL, RDRW_EXT)
+ * after a resize), or its rect contains 'area'. Such a redraw paints the
+ * widgets with their state at the time it runs, so a widget changed before
+ * then does not need to be painted on its own.
+ */
+bool
+frame_redraw_pending(struct xa_window *wind, const GRECT *area)
+{
+	struct xa_aesmsg_list *msg = wind->owner->irdrw_msg;
+
+	while (msg)
+	{
+		if (msg->message.irdrw.ptr == wind && msg->message.irdrw.xaw == 0)
+		{
+			GRECT *r = &msg->message.irdrw.rect;
+
+			if (!(r->g_w || r->g_h))
+				return true;
+			if (area && area->g_w > 0 && area->g_h > 0 && is_inside(area, r))
+				return true;
+		}
+		msg = msg->next;
+	}
+	return false;
+}
+
 static void
 remove_from_iredraw_queue(int lock, struct xa_window *wind)
 {
@@ -3110,10 +3192,61 @@ static bool join_redraws( short wlock, struct xa_window *wind, struct xa_rect_li
 	return false;
 }
 
+/*
+ * After a resize that only changed the height, everything above the work
+ * area (title, info line, menu, closer, fuller, iconifier, the top border)
+ * is still on screen exactly as before: those widgets keep their position
+ * and size, and the parts of the borders and the work-area frame up there
+ * are drawn the same way whatever the height. Return in 'area' the part of
+ * the window that needs its frame painted again: from the top of the work
+ * area, or of the first widget that moved or changed height, down to the
+ * bottom. Returns false when the whole frame must be painted.
+ */
+static bool
+changed_frame_area(struct xa_window *wind, const GRECT *old, const short *old_y, const short *old_h, GRECT *area)
+{
+	short f, top, bottom;
+
+	if (wind == root_window || wind->draw_canvas ||
+	    (wind->window_status & (XAWS_SHADED|XAWS_ICONIFIED)) ||
+	    wind->r.g_x != old->g_x || wind->r.g_y != old->g_y || wind->r.g_w != old->g_w)
+		return false;
+
+	top = wind->wa.g_y;
+	if (wind->rwa.g_y < top)
+		top = wind->rwa.g_y;
+
+	for (f = 0; f < XA_MAX_WIDGETS; f++)
+	{
+		XA_WIDGET *widg = &wind->widgets[f];
+
+		if (f == XAW_BORDER || f == XAW_TOOLBAR)
+			continue;
+		if (widg->ar.g_y != old_y[f] || widg->ar.g_h != old_h[f])
+		{
+			if (widg->ar.g_y < top)
+				top = widg->ar.g_y;
+			if (old_y[f] < top)
+				top = old_y[f];
+		}
+	}
+
+	bottom = wind->r.g_y + wind->r.g_h;
+	if (top <= wind->r.g_y || top >= bottom)
+		return false;
+
+	area->g_x = wind->r.g_x;
+	area->g_y = top;
+	area->g_w = wind->r.g_w;
+	area->g_h = bottom - top;
+	return true;
+}
+
 static void
 set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *new)
 {
 	short dir, resize, xmove, ymove, wlock = 0;
+	short old_y[XA_MAX_WIDGETS], old_h[XA_MAX_WIDGETS];
 	struct xa_rect_list *oldrl, *orl, *newrl, *brl, *prev, *next, *rrl, *nrl;
 	GRECT bs, bd, old, wa, oldw;
 
@@ -3124,6 +3257,11 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 
 	if (new)
 	{
+		for (dir = 0; dir < XA_MAX_WIDGETS; dir++)
+		{
+			old_y[dir] = wind->widgets[dir].ar.g_y;
+			old_h[dir] = wind->widgets[dir].ar.g_h;
+		}
 		wind->rc = wind->t = *new;
 		if ((wind->window_status & XAWS_SHADED))
 		{
@@ -3780,7 +3918,12 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 			 */
 			if (resize && !only_wa)
 			{
-				generate_redraws(wlock, wind, NULL, RDRW_EXT);
+				GRECT fr;
+
+				if (changed_frame_area(wind, &old, old_y, old_h, &fr))
+					generate_redraws(wlock, wind, &fr, RDRW_EXT);
+				else
+					generate_redraws(wlock, wind, NULL, RDRW_EXT);
 			}
 
 		} /* if (brl) */

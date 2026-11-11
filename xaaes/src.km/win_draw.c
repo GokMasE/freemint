@@ -1803,8 +1803,88 @@ draw_pu_canvas(struct xa_window *wind, GRECT *outer, GRECT *inner, const GRECT *
 /*
  * Draw a window widget
  */
+/*
+ * Split rectangle 'a' into the parts not covered by 'b' (at most 4).
+ * Returns the number of parts written to 'out'.
+ */
+static short
+rect_minus(const GRECT *a, const GRECT *b, GRECT *out)
+{
+	GRECT ix;
+	short n = 0, ay2, iy2;
+
+	if (!xa_rect_clip(a, b, &ix))
+	{
+		out[0] = *a;
+		return 1;
+	}
+	ay2 = a->g_y + a->g_h;
+	iy2 = ix.g_y + ix.g_h;
+
+	if (ix.g_y > a->g_y)		/* above */
+	{
+		out[n].g_x = a->g_x, out[n].g_y = a->g_y;
+		out[n].g_w = a->g_w, out[n].g_h = ix.g_y - a->g_y;
+		n++;
+	}
+	if (iy2 < ay2)			/* below */
+	{
+		out[n].g_x = a->g_x, out[n].g_y = iy2;
+		out[n].g_w = a->g_w, out[n].g_h = ay2 - iy2;
+		n++;
+	}
+	if (ix.g_x > a->g_x)		/* left */
+	{
+		out[n].g_x = a->g_x, out[n].g_y = ix.g_y;
+		out[n].g_w = ix.g_x - a->g_x, out[n].g_h = ix.g_h;
+		n++;
+	}
+	if (ix.g_x + ix.g_w < a->g_x + a->g_w)	/* right */
+	{
+		out[n].g_x = ix.g_x + ix.g_w, out[n].g_y = ix.g_y;
+		out[n].g_w = a->g_x + a->g_w - out[n].g_x, out[n].g_h = ix.g_h;
+		n++;
+	}
+	return n;
+}
+
+/*
+ * The area draw_widg_box() is guaranteed to paint opaquely with its
+ * background fill or texture (the box outline and 3D edges are left out).
+ * Returns false if it does not paint such an area.
+ */
+static bool
+widg_box_covers(struct xa_wcol_inf *wcoli, struct xa_wtexture *t, short state, const GRECT *wr, GRECT *cov)
+{
+	struct xa_wcol *wcol = (state & OS_SELECTED) ? &wcoli->selected : &wcoli->normal;
+	short f = wcoli->flags, o = 0;
+
+	if (!t && !wcol->texture)
+	{
+		/* only a VDI fill in replace mode is opaque */
+		if (!(f & WCOL_DRAWBKG) || wcoli->wr_mode != MD_REPLACE)
+			return false;
+	}
+	if ((f & WCOL_BOXED) && wcol->box_th > 0)
+		o -= wcol->box_th;
+	if (f & WCOL_DRAW3D)
+		o -= 1;
+
+	cov->g_x = wr->g_x - o;
+	cov->g_y = wr->g_y - o;
+	cov->g_w = wr->g_w + o + o;
+	cov->g_h = wr->g_h + o + o;
+	return cov->g_w > 0 && cov->g_h > 0;
+}
+
+/*
+ * Like draw_widg_box(), but the background fill and texture skip 'excl'
+ * (when not NULL), an area something else paints over right after.
+ * The texture stays aligned to 'anch', so the remaining parts line up
+ * exactly as if the whole box had been filled.
+ */
 static void
-draw_widg_box(struct xa_vdi_settings *v, short d, struct xa_wcol_inf *wcoli, struct xa_wtexture *t, short state, GRECT *wr, GRECT *anch)
+draw_widg_box_excl(struct xa_vdi_settings *v, short d, struct xa_wcol_inf *wcoli, struct xa_wtexture *t, short state, GRECT *wr, GRECT *anch, const GRECT *excl)
 {
 	struct xa_wcol *wcol;
 	struct xa_wtexture *wext;
@@ -1853,6 +1933,39 @@ draw_widg_box(struct xa_vdi_settings *v, short d, struct xa_wcol_inf *wcoli, str
 		o -= 1;
 	}
 
+	if (excl)
+	{
+		GRECT ir, parts[4];
+		short i, n;
+
+		ir.g_x = r.g_x - o;
+		ir.g_y = r.g_y - o;
+		ir.g_w = r.g_w + o + o;
+		ir.g_h = r.g_h + o + o;
+		n = rect_minus(&ir, excl, parts);
+
+		if (!t && (f & WCOL_DRAWBKG))
+		{
+			(*vapi->f_interior)(v, wcol->i);
+			if (wcol->i > 1)
+				(*vapi->f_style)(v, wcol->f);
+
+			(*vapi->f_color)(v, wcol->c);
+			for (i = 0; i < n; i++)
+				(*vapi->gbar)(v, 0, &parts[i]);
+		}
+		if (wext)
+		{
+			for (i = 0; i < n; i++)
+			{
+				/* draw_texture() modifies the rectangle */
+				GRECT pr = parts[i];
+				(*vapi->draw_texture)(v, wext->body, &pr, anch);
+			}
+		}
+		return;
+	}
+
 	if (!t && (f & WCOL_DRAWBKG))
 	{
 		(*vapi->f_interior)(v, wcol->i);
@@ -1871,6 +1984,12 @@ draw_widg_box(struct xa_vdi_settings *v, short d, struct xa_wcol_inf *wcoli, str
 		r.g_h += o + o;
 		(*vapi->draw_texture)(v, wext->body, &r, anch);
 	}
+}
+
+static void
+draw_widg_box(struct xa_vdi_settings *v, short d, struct xa_wcol_inf *wcoli, struct xa_wtexture *t, short state, GRECT *wr, GRECT *anch)
+{
+	draw_widg_box_excl(v, d, wcoli, t, state, wr, anch, NULL);
 }
 
 static void
@@ -2523,9 +2642,10 @@ d_vslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 {
 	int len, offs;
 	XA_SLIDER_WIDGET *sl = widg->stuff.sl;
-	GRECT cl;
+	GRECT cl, cov;
 	struct window_colours *wc = wind->colours;
-	struct xa_wtexture *t = 0;
+	struct xa_wtexture *t = 0, *tt = 0;
+	bool covered;
 
 	sl->flags &= ~SLIDER_UPDATE;
 
@@ -2555,11 +2675,6 @@ d_vslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 	if (offs + len > widg->ar.g_y + widg->ar.g_h)
 		len = widg->ar.g_y + widg->ar.g_h - offs;
 
-#if WITH_GRADIENTS
-	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->vslide, 0, widg->ar.g_w, widg->ar.g_h);
-#endif
-	draw_widg_box(wind->vdi_settings, 0, &wc->vslide, t, 0, &widg->ar, &widg->ar);
-
 	sl->r.g_y = offs - widg->ar.g_y;
 	sl->r.g_h = len;
 	sl->r.g_w = widg->ar.g_w;
@@ -2570,9 +2685,17 @@ d_vslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 	cl.g_h = sl->r.g_h;
 
 #if WITH_GRADIENTS
-	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->vslider, 2, cl.g_w, cl.g_h);
+	tt = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->vslider, 2, cl.g_w, cl.g_h);
 #endif
-	draw_widg_box(wind->vdi_settings, 0/*-1*/, &wc->vslider, t, widg->state, &cl, &cl);
+	/* the track fill skips the area the thumb paints over anyway */
+	covered = widg_box_covers(&wc->vslider, tt, widg->state, &cl, &cov);
+
+#if WITH_GRADIENTS
+	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->vslide, 0, widg->ar.g_w, widg->ar.g_h);
+#endif
+	draw_widg_box_excl(wind->vdi_settings, 0, &wc->vslide, t, 0, &widg->ar, &widg->ar, covered ? &cov : NULL);
+
+	draw_widg_box(wind->vdi_settings, 0/*-1*/, &wc->vslider, tt, widg->state, &cl, &cl);
 	return true;
 }
 
@@ -2582,8 +2705,9 @@ d_hslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 	int len, offs;
 	XA_SLIDER_WIDGET *sl = widg->stuff.sl;
 	struct window_colours *wc = wind->colours;
-	struct xa_wtexture *t = 0;
-	GRECT cl;
+	struct xa_wtexture *t = 0, *tt = 0;
+	GRECT cl, cov;
+	bool covered;
 
 	sl->flags &= ~SLIDER_UPDATE;
 
@@ -2611,11 +2735,6 @@ d_hslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 	if (offs + len > widg->ar.g_x + widg->ar.g_w)
 		len = widg->ar.g_x + widg->ar.g_w - offs;
 
-#if WITH_GRADIENTS
-	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->hslide, 0, widg->ar.g_w, widg->ar.g_h);
-#endif
-	draw_widg_box(wind->vdi_settings, 0, &wc->hslide, t, 0, &widg->ar, &widg->ar/*&wind->r*/);
-
 	sl->r.g_x = offs - widg->ar.g_x;
 	sl->r.g_w = len;
 	sl->r.g_h = widg->ar.g_h;
@@ -2626,9 +2745,17 @@ d_hslide(struct xa_window *wind, struct xa_widget *widg, const GRECT *clip)
 	cl.g_h = sl->r.g_h;
 
 #if WITH_GRADIENTS
-	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->hslider, 2, cl.g_w, cl.g_h);
+	tt = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->hslider, 2, cl.g_w, cl.g_h);
 #endif
-	draw_widg_box(wind->vdi_settings, 0/*-1*/, &wc->hslider, t, widg->state, &cl, &cl/*&wind->r*/);
+	/* the track fill skips the area the thumb paints over anyway */
+	covered = widg_box_covers(&wc->hslider, tt, widg->state, &cl, &cov);
+
+#if WITH_GRADIENTS
+	t = get_widg_gradient(wind->vdi_settings, widg, wc, &wc->hslide, 0, widg->ar.g_w, widg->ar.g_h);
+#endif
+	draw_widg_box_excl(wind->vdi_settings, 0, &wc->hslide, t, 0, &widg->ar, &widg->ar/*&wind->r*/, covered ? &cov : NULL);
+
+	draw_widg_box(wind->vdi_settings, 0/*-1*/, &wc->hslider, tt, widg->state, &cl, &cl/*&wind->r*/);
 	return true;
 }
 
