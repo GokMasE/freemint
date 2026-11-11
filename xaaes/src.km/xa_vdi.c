@@ -245,27 +245,32 @@ xa_t_effects(struct xa_vdi_settings *v, short efx)
 static void _cdecl
 xa_t_font(struct xa_vdi_settings *v, short point, short id)
 {
+	bool changed = false;
+
 	if (id != -1 && v->font_rid != id)
 	{
 		v->font_rid = id;
 		v->font_sid = vst_font(v->handle, id);
-		id = 0;
+		changed = true;
 		if (point == -1)
 			point = v->font_rsize;
 	}
-	else
-		id = 1;
 
 	/*
 	 * Ozk: Hmm... have to reset point size when changing fonts!!??
+	 *
+	 * The point size is cached: vst_point()/vqt_fontinfo() are only
+	 * issued when the font or the requested size actually changed.
+	 * Anything calling vst_point()/vst_font() directly on v->handle
+	 * must invalidate the cache (font_rsize = -1 / font_rid = -1).
 	 */
-	if (point != -1 )
+	if (point != -1 && (changed || point != v->font_rsize))
 	{
 		v->font_rsize = point;
 		v->font_ssize = vst_point(v->handle, point, &v->font_w, &v->font_h, &v->cell_w, &v->cell_h);
-		id = 0;
+		changed = true;
 	}
-	if (!id)
+	if (changed)
 	{
 		vqt_fontinfo(v->handle, &v->first_ade, &v->last_ade, &v->dists[0], &v->max_w, &v->efx[0]);
 		v->dists[5] = 0;

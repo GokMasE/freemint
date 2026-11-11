@@ -227,6 +227,8 @@ short set_xa_fnt( int pt, struct xa_wtxt_inf *wp[], OBJECT *obtree, int objs[], 
 
 	vdih = C.Aes->vdi_settings->handle;
 	vst_point(vdih, wpp->normal.font_point, &w, &h, &oldw, &oldh);
+	/* vst_point() behind t_font's back: invalidate its point-size cache */
+	C.Aes->vdi_settings->font_rsize = -1;
 
 	oldpt = wpp->normal.font_point;
 
