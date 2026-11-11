@@ -833,6 +833,10 @@ k_init(unsigned short dev, unsigned short mc)
 	 * If we are using anything apart from the system font for windows,
 	 * better check for GDOS and load the fonts.
 	 */
+	/* invalidate the t_font cache so the first call sets font and size */
+	v->font_rid = -1;
+	v->font_rsize = -1;
+
 	if ((C.gdos_version = vq_gdos()))
 		(*v->api->load_fonts)(v);
 	else

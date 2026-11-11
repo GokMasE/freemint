@@ -245,27 +245,32 @@ xa_t_effects(struct xa_vdi_settings *v, short efx)
 static void _cdecl
 xa_t_font(struct xa_vdi_settings *v, short point, short id)
 {
+	bool changed = false;
+
 	if (id != -1 && v->font_rid != id)
 	{
 		v->font_rid = id;
 		v->font_sid = vst_font(v->handle, id);
-		id = 0;
+		changed = true;
 		if (point == -1)
 			point = v->font_rsize;
 	}
-	else
-		id = 1;
 
 	/*
 	 * Ozk: Hmm... have to reset point size when changing fonts!!??
+	 *
+	 * The point size is cached: vst_point()/vqt_fontinfo() are only
+	 * issued when the font or the requested size actually changed.
+	 * Anything calling vst_point()/vst_font() directly on v->handle
+	 * must invalidate the cache (font_rsize = -1 / font_rid = -1).
 	 */
-	if (point != -1 )
+	if (point != -1 && (changed || point != v->font_rsize))
 	{
 		v->font_rsize = point;
 		v->font_ssize = vst_point(v->handle, point, &v->font_w, &v->font_h, &v->cell_w, &v->cell_h);
-		id = 0;
+		changed = true;
 	}
-	if (!id)
+	if (changed)
 	{
 		vqt_fontinfo(v->handle, &v->first_ade, &v->last_ade, &v->dists[0], &v->max_w, &v->efx[0]);
 		v->dists[5] = 0;
@@ -322,6 +327,28 @@ xa_prop_clipped_name(struct xa_vdi_settings *v, const char *s, char *d, int w, s
 	short cw, tmp;
 	char *dst = d;
 	char end[256];
+
+	/*
+	 * Fast path: if the whole string fits, one vqt_extent() replaces
+	 * one vqt_width() per character plus the final extent.
+	 */
+	if (method != -1)
+	{
+		short tw, th;
+
+		xa_t_extent(v, s, &tw, &th);
+		if (tw <= w)
+		{
+			if (d != s)
+				strcpy(d, s);
+			if (ret_w && ret_h)
+			{
+				*ret_w = tw;
+				*ret_h = th;
+			}
+			return d;
+		}
+	}
 
 	switch (method)
 	{
@@ -445,11 +472,14 @@ xa_wtxt_output(struct xa_vdi_settings *v, struct xa_wtxt_inf *wtxti, char *txt, 
 	xa_t_effects(v, wtxt->effects);
 
 	if (f & WTXT_NOCLIP)
+	{
 		strncpy(t, txt, sizeof(t));
-	else
+		t[sizeof(t) - 1] = '\0';
+		xa_t_extent(v, t, &x, &y);
+	}
+	else	/* returns the extent of the clipped string in x/y */
 		xa_prop_clipped_name(v, txt, t, r->g_w - (xoff << 1), &x, &y, 1);
 
-	xa_t_extent(v, t, &x, &y);
 	y = yoff + r->g_y + ((r->g_h - y) >> 1);
 
 	if (f & WTXT_CENTER)
