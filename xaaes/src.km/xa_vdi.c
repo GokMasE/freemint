@@ -764,6 +764,8 @@ xa_draw_texture(struct xa_vdi_settings *v, XAMFDB *msrc, GRECT *r, GRECT *anch)
 {
 	short pnt[8];
 	short x, y, w, h, sy, sh, dy, dh, width, height;
+	short cx0 = v->clip.g_x, cy0 = v->clip.g_y;
+	short cx1 = cx0 + v->clip.g_w - 1, cy1 = cy0 + v->clip.g_h - 1;
 	MFDB mscreen;
 
 	mscreen.fd_addr = NULL;
@@ -815,7 +817,30 @@ xa_draw_texture(struct xa_vdi_settings *v, XAMFDB *msrc, GRECT *r, GRECT *anch)
 
 			pnt[7] = pnt[5] + h - 1;
 
-			vro_cpyfm(v->handle, S_ONLY, pnt, &msrc->mfdb, &mscreen);
+			/*
+			 * Only blit the part of this tile that lies inside the
+			 * clip rectangle. Gradients are one pixmap the size of
+			 * the whole object, so without this every rectangle of
+			 * a redraw copied the full object area.
+			 */
+			if (pnt[6] >= cx0 && pnt[4] <= cx1 && pnt[7] >= cy0 && pnt[5] <= cy1)
+			{
+				short cp[8], d;
+
+				cp[0] = pnt[0]; cp[1] = pnt[1]; cp[2] = pnt[2]; cp[3] = pnt[3];
+				cp[4] = pnt[4]; cp[5] = pnt[5]; cp[6] = pnt[6]; cp[7] = pnt[7];
+
+				if ((d = cx0 - cp[4]) > 0)
+					cp[0] += d, cp[4] += d;
+				if ((d = cp[6] - cx1) > 0)
+					cp[2] -= d, cp[6] -= d;
+				if ((d = cy0 - cp[5]) > 0)
+					cp[1] += d, cp[5] += d;
+				if ((d = cp[7] - cy1) > 0)
+					cp[3] -= d, cp[7] -= d;
+
+				vro_cpyfm(v->handle, S_ONLY, cp, &msrc->mfdb, &mscreen);
+			}
 
 			h = msrc->d_h;
 		}
