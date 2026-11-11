@@ -3608,7 +3608,15 @@ set_obtext(TEDINFO *ted,
 		cur_x = format_dialog_text(temp_text, ted->te_ptmplt, ted->te_ptext, edit_pos, &start_tpos);
 	}
 	else
-		strncpy(temp_text, ted->te_ptext, 255);
+	{
+		/* bounded copy without strncpy()'s zero fill of the whole buffer */
+		const char *src = ted->te_ptext;
+		char *dst = temp_text, *end = temp_text + 255;
+
+		while (dst < end && (*dst = *src++) != '\0')
+			dst++;
+		*dst = '\0';
+	}
 
 	(*v->api->t_effects)(v, 0);	/* use normal style */
 
@@ -5429,8 +5437,6 @@ d_g_string(struct widget_tree *wt, struct xa_vdi_settings *v)
 	if (t)
 	{
 		fl3d = (ob->ob_flags & OF_FL3DMASK) >> 9;
-		strncpy(text, t, 254);
-		text[255] = '\0';
 
 		selected = ob->ob_state & OS_SELECTED;
 
@@ -5467,12 +5473,17 @@ d_g_string(struct widget_tree *wt, struct xa_vdi_settings *v)
 
 		if (wt->is_menu
 		    && (ob->ob_state & OS_DISABLED)
-		    && *text == '-')
+		    && *t == '-')
 		{
 			/* If optional text is found, remove leading and trailing '-' */
 			short start_pos = 0;
 			char *end_pos;
 			short old_rx, old_rw;
+
+			/* only this path edits the string, so only it needs a copy
+			 * (strncpy() also zero-filled all 254 bytes every time) */
+			strncpy(text, t, 254);
+			text[254] = '\0';
 
 			while (text[start_pos] == '-')
 				start_pos++;

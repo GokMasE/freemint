@@ -942,6 +942,29 @@ short flags)
 // 	else
 // 		curson = false;
 
+	/*
+	 * Drawing a single object or subtree (objc_change, edit fields,
+	 * progress bars...) used to walk every object in front of it just to
+	 * find it. Jump straight to it unless the walk has side effects
+	 * (toolbar resize relocates every object it passes).
+	 */
+	if (!resized && aesobj_item(&item) > 0 && aesobj_tree(&item) == wt->tree)
+	{
+		short px, py;
+
+		bool hidden;
+
+		if (ob_parent_origin(wt->tree, aesobj_item(&item), &px, &py, &hidden, NULL))
+		{
+			/* a hidden ancestor: the walk would never reach item */
+			if (hidden)
+				goto walk_done;
+			x += px;
+			y += py;
+			*c = item;
+		}
+	}
+
 	do {
 
 		if( resized == true ){
@@ -1094,6 +1117,8 @@ downlink:
 		}
 	}
 	while (valid_aesobj(c) && !same_aesobj(c, &stop)  && rel_depth > 0);
+
+walk_done:
 
 	if (curson)
 		(*wt->objcr_api->draw_cursor)(wt, v, NULL, 1);

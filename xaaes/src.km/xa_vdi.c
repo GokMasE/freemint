@@ -242,6 +242,40 @@ xa_t_effects(struct xa_vdi_settings *v, short efx)
 	}
 }
 
+/*
+ * Find out whether the font just selected is fixed width, so xa_t_extent()
+ * can compute string extents instead of calling vqt_extent() each time.
+ * The font has to report the same advance for a narrow, a wide and a
+ * punctuation character, and vqt_extent() of one character must agree.
+ * Only measured with no text effects active, since effects change the
+ * extent; otherwise the fast path stays off until the next font change.
+ */
+static void
+measure_mono(struct xa_vdi_settings *v)
+{
+	short wi, ww, wd, tmp, e[8];
+
+	v->mono_w = v->mono_h = 0;
+
+	if (v->text_effects != 0)
+		return;
+
+	if (vqt_width(v->handle, 'i', &wi, &tmp, &tmp) == -1
+	 || vqt_width(v->handle, 'W', &ww, &tmp, &tmp) == -1
+	 || vqt_width(v->handle, '.', &wd, &tmp, &tmp) == -1)
+		return;
+
+	if (wi <= 0 || wi != ww || wi != wd)
+		return;
+
+	vqt_extent(v->handle, "W", e);
+	if (e[4] - e[6] != wi)
+		return;
+
+	v->mono_w = wi;
+	v->mono_h = -(e[1] - e[7]);
+}
+
 static void _cdecl
 xa_t_font(struct xa_vdi_settings *v, short point, short id)
 {
@@ -274,6 +308,7 @@ xa_t_font(struct xa_vdi_settings *v, short point, short id)
 	{
 		vqt_fontinfo(v->handle, &v->first_ade, &v->last_ade, &v->dists[0], &v->max_w, &v->efx[0]);
 		v->dists[5] = 0;
+		measure_mono(v);
 	}
 }
 
@@ -285,8 +320,8 @@ xa_t_alignment(struct xa_vdi_settings *v, short halign, short valign)
 	vst_alignment(v->handle, halign, valign, &dummy, &dummy);
 }
 
-static void _cdecl
-xa_t_extent(struct xa_vdi_settings *v, const char *t, short *w, short *h)
+static void
+vdi_t_extent(struct xa_vdi_settings *v, const char *t, short *w, short *h)
 {
 	short e[8];
 
@@ -301,6 +336,35 @@ xa_t_extent(struct xa_vdi_settings *v, const char *t, short *w, short *h)
 }
 
 static void _cdecl
+xa_t_extent(struct xa_vdi_settings *v, const char *t, short *w, short *h)
+{
+	/*
+	 * Fixed-width font, no effects, cache valid: the extent is just
+	 * length * advance. Any character outside the font's range, or an
+	 * empty string, goes to the VDI so the result stays identical.
+	 */
+	if (v->mono_w && *t && v->text_effects == 0 && v->font_rid != -1 && v->font_rsize != -1)
+	{
+		const unsigned char *s = (const unsigned char *)t;
+		short n = 0;
+
+		while (*s)
+		{
+			if (*s < v->first_ade || *s > v->last_ade)
+				break;
+			s++, n++;
+		}
+		if (!*s)
+		{
+			*w = n * v->mono_w;
+			*h = v->mono_h;
+			return;
+		}
+	}
+	vdi_t_extent(v, t, w, h);
+}
+
+static void _cdecl
 xa_text_extent(struct xa_vdi_settings *v, const char *t, struct xa_fnt_info *f, short *w, short *h)
 {
 	PRDEF( xa_text_extent, xa_t_font );
@@ -311,9 +375,13 @@ xa_text_extent(struct xa_vdi_settings *v, const char *t, struct xa_fnt_info *f, 
 
 	if( f->effects ){
 		PROFRECv( vst_effects,(v->handle, f->effects));
+		/* effects set behind the cache's back: must ask the VDI */
+		vdi_t_extent(v, t, w, h);
 	}
-
-	PROFRECv( xa_t_extent,(v, t, w, h));
+	else
+	{
+		PROFRECv( xa_t_extent,(v, t, w, h));
+	}
 
 	if( f->effects ){
 		PROFRECv( vst_effects,(v->handle, 0));
@@ -764,6 +832,8 @@ xa_draw_texture(struct xa_vdi_settings *v, XAMFDB *msrc, GRECT *r, GRECT *anch)
 {
 	short pnt[8];
 	short x, y, w, h, sy, sh, dy, dh, width, height;
+	short cx0 = v->clip.g_x, cy0 = v->clip.g_y;
+	short cx1 = cx0 + v->clip.g_w - 1, cy1 = cy0 + v->clip.g_h - 1;
 	MFDB mscreen;
 
 	mscreen.fd_addr = NULL;
@@ -815,7 +885,30 @@ xa_draw_texture(struct xa_vdi_settings *v, XAMFDB *msrc, GRECT *r, GRECT *anch)
 
 			pnt[7] = pnt[5] + h - 1;
 
-			vro_cpyfm(v->handle, S_ONLY, pnt, &msrc->mfdb, &mscreen);
+			/*
+			 * Only blit the part of this tile that lies inside the
+			 * clip rectangle. Gradients are one pixmap the size of
+			 * the whole object, so without this every rectangle of
+			 * a redraw copied the full object area.
+			 */
+			if (pnt[6] >= cx0 && pnt[4] <= cx1 && pnt[7] >= cy0 && pnt[5] <= cy1)
+			{
+				short cp[8], d;
+
+				cp[0] = pnt[0]; cp[1] = pnt[1]; cp[2] = pnt[2]; cp[3] = pnt[3];
+				cp[4] = pnt[4]; cp[5] = pnt[5]; cp[6] = pnt[6]; cp[7] = pnt[7];
+
+				if ((d = cx0 - cp[4]) > 0)
+					cp[0] += d, cp[4] += d;
+				if ((d = cp[6] - cx1) > 0)
+					cp[2] -= d, cp[6] -= d;
+				if ((d = cy0 - cp[5]) > 0)
+					cp[1] += d, cp[5] += d;
+				if ((d = cp[7] - cy1) > 0)
+					cp[3] -= d, cp[7] -= d;
+
+				vro_cpyfm(v->handle, S_ONLY, cp, &msrc->mfdb, &mscreen);
+			}
 
 			h = msrc->d_h;
 		}

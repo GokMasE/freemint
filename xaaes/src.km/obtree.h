@@ -103,6 +103,7 @@ struct sc2
 void			ob_fix_shortcuts(OBJECT *obtree, bool not_hidden, struct sc2 *scp);
 struct xa_aes_object 	ob_find_shortcut(OBJECT *tree, ushort nk, short stop_type);
 
+bool	ob_parent_origin(OBJECT *tree, short item, short *px, short *py, bool *hidden, short *parent);
 short	ob_offset(OBJECT *obtree, struct xa_aes_object object, short *mx, short *my);
 // void	ob_rectangle(OBJECT *obtree, struct xa_aes_object obj, GRECT *c);
 // void	ob_area(OBJECT *obtree, struct xa_aes_object obj, GRECT *c);

@@ -61,6 +61,13 @@ struct xa_vdi_settings
 	short	max_w;
 	short	dists[6];
 	short	efx[3];
+	/*
+	 * Monospace fast path for t_extent: when the current font has been
+	 * measured as fixed width (with no text effects), mono_w/mono_h are
+	 * its per-character advance and line height; 0 disables the path.
+	 * Recomputed by t_font whenever the font or size changes.
+	 */
+	short	mono_w, mono_h;
 };
 
 struct xa_mfdb
