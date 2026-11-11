@@ -1030,8 +1030,7 @@ uplink:
 
 		if (!aesobj_hidden(c))
 		{
-			/* uplink is an out-of-line call; only G_OBLINK can take it */
-			if ((aesobj_type(c) & 0xff) == G_OBLINK && set_aesobj_uplink(&tree, c, &stop, &oblink))
+			if (set_aesobj_uplink(&tree, c, &stop, &oblink))
 				goto uplink;
 
 			if (start_drawing)
