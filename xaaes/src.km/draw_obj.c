@@ -848,7 +848,7 @@ display_object(int lock, XA_TREE *wt, struct xa_vdi_settings *v, struct xa_aes_o
  * ob_next/ob_tail and sums the ancestors' positions, which is where the
  * full walk would have put the parent origin.
  *
- * Returns  1: *px/*py hold the parent origin (relative to the tree origin)
+ * Returns  1: px, py hold the parent origin (relative to the tree origin)
  *          0: an ancestor is hidden, so the full walk would never reach
  *             'item' and draws nothing
  *         -1: can't tell (G_OBLINK ancestor, broken links), use the walk
