@@ -323,6 +323,28 @@ xa_prop_clipped_name(struct xa_vdi_settings *v, const char *s, char *d, int w, s
 	char *dst = d;
 	char end[256];
 
+	/*
+	 * Fast path: if the whole string fits, one vqt_extent() replaces
+	 * one vqt_width() per character plus the final extent.
+	 */
+	if (method != -1)
+	{
+		short tw, th;
+
+		xa_t_extent(v, s, &tw, &th);
+		if (tw <= w)
+		{
+			if (d != s)
+				strcpy(d, s);
+			if (ret_w && ret_h)
+			{
+				*ret_w = tw;
+				*ret_h = th;
+			}
+			return d;
+		}
+	}
+
 	switch (method)
 	{
 		/*
@@ -445,11 +467,14 @@ xa_wtxt_output(struct xa_vdi_settings *v, struct xa_wtxt_inf *wtxti, char *txt, 
 	xa_t_effects(v, wtxt->effects);
 
 	if (f & WTXT_NOCLIP)
+	{
 		strncpy(t, txt, sizeof(t));
-	else
+		t[sizeof(t) - 1] = '\0';
+		xa_t_extent(v, t, &x, &y);
+	}
+	else	/* returns the extent of the clipped string in x/y */
 		xa_prop_clipped_name(v, txt, t, r->g_w - (xoff << 1), &x, &y, 1);
 
-	xa_t_extent(v, t, &x, &y);
 	y = yoff + r->g_y + ((r->g_h - y) >> 1);
 
 	if (f & WTXT_CENTER)
