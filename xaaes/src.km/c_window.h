@@ -124,7 +124,7 @@ void	send_closed	(int lock, struct xa_window *wind);
 //void	send_redraw	(int lock, struct xa_window *wind, GRECT *r);
 void	send_iredraw	(int lock, struct xa_window *wind, short xaw, GRECT *r);
 void	generate_redraws(int lock, struct xa_window *wind, GRECT *r, short flags);
-bool	frame_redraw_pending(struct xa_window *wind);
+bool	frame_redraw_pending(struct xa_window *wind, const GRECT *area);
 
 //void	send_ontop(int lock);
 //void	send_untop(int lock, struct xa_window *wind);

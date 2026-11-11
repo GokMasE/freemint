@@ -257,7 +257,7 @@ static const char *setget(int i)
 static void
 display_slider(int lock, struct xa_window *w, XA_WIDGET *widg)
 {
-	if (!frame_redraw_pending(w))
+	if (!frame_redraw_pending(w, &widg->ar))
 		display_widget(lock, w, widg, NULL);
 }
 
@@ -473,14 +473,18 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 	/* set window name line */
 	case WF_NAME:
 	{
-		set_window_title(w, ptr_from_shorts(pb->intin[2], pb->intin[3]), true);
+		/* a queued frame redraw paints the new title anyway */
+		set_window_title(w, ptr_from_shorts(pb->intin[2], pb->intin[3]),
+				 !frame_redraw_pending(w, &get_widget(w, XAW_TITLE)->ar));
 		break;
 	}
 
 	/* set window info line */
 	case WF_INFO:
 	{
-		set_window_info(w, ptr_from_shorts(pb->intin[2], pb->intin[3]), true);
+		/* a queued frame redraw paints the new info line anyway */
+		set_window_info(w, ptr_from_shorts(pb->intin[2], pb->intin[3]),
+				!frame_redraw_pending(w, &get_widget(w, XAW_INFO)->ar));
 		break;
 	}
 	/* Move a window, check sizes */
