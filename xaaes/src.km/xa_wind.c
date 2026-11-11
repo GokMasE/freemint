@@ -247,6 +247,19 @@ static const char *setget(int i)
 }
 #endif /* GENERATE_DIAGS */
 
+/*
+ * Paint a slider after wind_set() changed it, unless a redraw of the whole
+ * frame is already queued for the window (the usual case during a live
+ * resize, where the app answers WM_SIZED with WF_CURRXYWH and then sets
+ * its sliders). That queued redraw paints the slider with its new values,
+ * so painting it here as well would only write the same area twice.
+ */
+static void
+display_slider(int lock, struct xa_window *w, XA_WIDGET *widg)
+{
+	if (!frame_redraw_pending(w))
+		display_widget(lock, w, widg, NULL);
+}
 
 unsigned long
 XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
@@ -368,7 +381,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				{
 					slw->position = newpos;
 					slw->rpos = newrpos;
-					display_widget(lock, w, widg, NULL);
+					display_slider(lock, w, widg);
 				}
 			}
 			else
@@ -376,7 +389,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				if (slw->position != newpos)
 				{
 					slw->position = newpos;
-					display_widget(lock, w, widg, NULL);
+					display_slider(lock, w, widg);
 				}
 			}
 		}
@@ -402,7 +415,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				{
 					slw->position = newpos;
 					slw->rpos = newrpos;
-					display_widget(lock, w, widg, NULL);
+					display_slider(lock, w, widg);
 				}
 			}
 			else
@@ -410,7 +423,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				if (slw->position != newpos)
 				{
 					slw->position = newpos;
-					display_widget(lock, w, widg, NULL);
+					display_slider(lock, w, widg);
 				}
 			}
 		}
@@ -431,7 +444,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 			if (slw->length != newlen)
 			{
 				slw->length = newlen;
-				display_widget(lock, w, widg, NULL);
+				display_slider(lock, w, widg);
 			}
 		}
 		break;
@@ -451,7 +464,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 			if (slw->length != newlen)
 			{
 				slw->length = newlen;
-				display_widget(lock, w, widg, NULL);
+				display_slider(lock, w, widg);
 			}
 		}
 		break;

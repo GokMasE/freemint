@@ -1025,6 +1025,30 @@ generate_redraws(int lock, struct xa_window *wind, GRECT *r, short flags)
 	}
 	DIAGS(("generate_redraws: !"));
 }
+/*
+ * True if a redraw of the whole window frame (as queued by
+ * generate_redraws(.., NULL, RDRW_EXT), e.g. after a resize) is still
+ * waiting in the owner's internal redraw queue. That redraw paints every
+ * widget with its state at the time it runs, so a widget changed before
+ * then does not need to be painted on its own.
+ */
+bool
+frame_redraw_pending(struct xa_window *wind)
+{
+	struct xa_aesmsg_list *msg = wind->owner->irdrw_msg;
+
+	while (msg)
+	{
+		if (msg->message.irdrw.ptr == wind &&
+		    msg->message.irdrw.xaw == 0 &&
+		    msg->message.irdrw.rect.g_w == 0 &&
+		    msg->message.irdrw.rect.g_h == 0)
+			return true;
+		msg = msg->next;
+	}
+	return false;
+}
+
 static void
 remove_from_iredraw_queue(int lock, struct xa_window *wind)
 {
