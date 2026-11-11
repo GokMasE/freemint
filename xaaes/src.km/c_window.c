@@ -1869,6 +1869,15 @@ draw_window(int lock, struct xa_window *wind, const GRECT *clip)
 					}
 					else
 					{
+						/*
+						 * Skip widgets that do not touch this clip rectangle.
+						 * widg->ar is kept current by calc_work_area() for row
+						 * widgets; the border, toolbar and menu are always drawn.
+						 */
+						if (f != XAW_BORDER && f != XAW_TOOLBAR && f != XAW_MENU &&
+						    widg->ar.g_w > 0 && widg->ar.g_h > 0 &&
+						    !xa_rect_clip(clip, &widg->ar, &r))
+							continue;
 	 					//if (f == XAW_TOOLBAR) display("drawing toolbar for %s", wind->owner->name);
 						widg->m.r.draw(wind, widg, clip );
 					}
