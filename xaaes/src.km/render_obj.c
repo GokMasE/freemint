@@ -2467,6 +2467,33 @@ set_colours(OBJECT *ob, struct xa_vdi_settings *v, struct theme *t, BFOBSPEC *co
 static void
 draw_3defx(struct xa_vdi_settings *v, struct color_theme *ct, bool selected, short o, short d3_thick, GRECT *r)
 {
+	/*
+	 * Usual theme case: left == top and right == bottom colour. Two 3-point
+	 * hooks give the same pixels as four lines (the later hook owns the two
+	 * shared corners, as the later line did) with half the v_pline calls.
+	 */
+	if (d3_thick && v->wr_mode == MD_REPLACE &&
+	    ct->col.left == ct->col.top && ct->col.right == ct->col.bottom)
+	{
+		bool tl_last = selected ? (ct->col.flags & WCOL_REV3D) == 0 : (ct->col.flags & WCOL_REV3D) != 0;
+
+		while (d3_thick > 0)
+		{
+			if (tl_last)
+			{
+				(*v->api->br_hook)(v, o, r, ct->col.right);
+				(*v->api->tl_hook)(v, o, r, ct->col.left);
+			}
+			else
+			{
+				(*v->api->tl_hook)(v, o, r, ct->col.left);
+				(*v->api->br_hook)(v, o, r, ct->col.right);
+			}
+			o--, d3_thick--;
+		}
+		return;
+	}
+
 	if (d3_thick)
 	{
 		if (selected)
