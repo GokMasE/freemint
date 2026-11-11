@@ -2602,7 +2602,7 @@ clean_aesobj_links(struct oblink_spec **oblink)
 /*
  * Find where a non-root object sits without walking the tree to it.
  * Climbs from 'item' to the root via ob_next/ob_tail and sums the
- * ancestors' positions: *px/*py is the origin of item's parent relative
+ * ancestors' positions: px, py is the origin of item's parent relative
  * to the tree origin (root's ob_x/ob_y included), which is what a full
  * walk from the root would have accumulated on reaching 'item'.
  * *hidden is set if any ancestor has OF_HIDETREE; *parent (if not NULL)
