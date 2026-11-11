@@ -842,6 +842,55 @@ display_object(int lock, XA_TREE *wt, struct xa_vdi_settings *v, struct xa_aes_o
  * HR: is_menu is true if a menu.
  */
 
+/*
+ * Start objc_draw() directly at a non-root start object instead of walking
+ * the tree from the root to find it. Climbs from 'item' to the root via
+ * ob_next/ob_tail and sums the ancestors' positions, which is where the
+ * full walk would have put the parent origin.
+ *
+ * Returns  1: *px/*py hold the parent origin (relative to the tree origin)
+ *          0: an ancestor is hidden, so the full walk would never reach
+ *             'item' and draws nothing
+ *         -1: can't tell (G_OBLINK ancestor, broken links), use the walk
+ */
+static short
+start_object_origin(OBJECT *tree, short item, short *px, short *py)
+{
+	short o = item, n, x = 0, y = 0, guard = 0;
+	bool hidden = false;
+
+	while (o != 0)
+	{
+		/* the parent is the first object along ob_next whose tail we came from */
+		for (;;)
+		{
+			n = tree[o].ob_next;
+			if (n < 0 || ++guard > 4096)
+				return -1;
+			if (tree[n].ob_tail == o)
+				break;
+			o = n;
+		}
+		o = n;
+
+		/* a link replaces its own children during the walk */
+		if ((tree[o].ob_type & 0xff) == G_OBLINK)
+			return -1;
+		if (tree[o].ob_flags & OF_HIDETREE)
+			hidden = true;
+
+		x += tree[o].ob_x;
+		y += tree[o].ob_y;
+	}
+
+	if (hidden)
+		return 0;
+
+	*px = x;
+	*py = y;
+	return 1;
+}
+
 /* draw_object_tree */
 short
 draw_object_tree(
@@ -941,6 +990,30 @@ short flags)
 	}
 // 	else
 // 		curson = false;
+
+	/*
+	 * Drawing a single object or subtree (objc_change, edit fields,
+	 * progress bars...) used to walk every object in front of it just to
+	 * find it. Jump straight to it unless the walk has side effects
+	 * (toolbar resize relocates every object it passes).
+	 */
+	if (!resized && aesobj_item(&item) > 0 && aesobj_tree(&item) == wt->tree)
+	{
+		short px, py;
+
+		switch (start_object_origin(wt->tree, aesobj_item(&item), &px, &py))
+		{
+			case 1:
+				x += px;
+				y += py;
+				*c = item;
+				break;
+			case 0:
+				goto walk_done;
+			default:
+				break;
+		}
+	}
 
 	do {
 
@@ -1094,6 +1167,8 @@ downlink:
 		}
 	}
 	while (valid_aesobj(c) && !same_aesobj(c, &stop)  && rel_depth > 0);
+
+walk_done:
 
 	if (curson)
 		(*wt->objcr_api->draw_cursor)(wt, v, NULL, 1);
