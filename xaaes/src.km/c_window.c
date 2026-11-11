@@ -734,14 +734,25 @@ set_window_title(struct xa_window *wind, const char *title, bool redraw)
 {
 	char *dst = wind->wname;
 	XA_WIDGET *widg;
+	bool changed = false;
 
 	if (title)
 	{
 		int i;
 
-		for (i = 0; i < (sizeof(wind->wname)-1) && (*dst++ = *title++); i++)
-			;
+		for (i = 0; i < (sizeof(wind->wname)-1); i++)
+		{
+			char c = *title++;
+
+			if (*dst != c)
+				changed = true;
+			*dst++ = c;
+			if (!c)
+				break;
+		}
 	}
+	else if (*dst)
+		changed = true;
 	*dst = '\0';
 
 	widg = get_widget(wind, XAW_TITLE);
@@ -750,7 +761,8 @@ set_window_title(struct xa_window *wind, const char *title, bool redraw)
 	DIAG((D_wind, wind->owner, "    -   %s", wind->wname));
 
 	/* redraw if necessary */
-	if (redraw && (wind->active_widgets & NAME) && ((wind->window_status & (XAWS_OPEN|XAWS_HIDDEN)) == XAWS_OPEN))
+	/* redraw only if the text actually changed (apps polling WF_NAME) */
+	if (redraw && changed && (wind->active_widgets & NAME) && ((wind->window_status & (XAWS_OPEN|XAWS_HIDDEN)) == XAWS_OPEN))
 	{
 		GRECT clip;
 
@@ -768,14 +780,25 @@ set_window_info(struct xa_window *wind, const char *info, bool redraw)
 {
 	char *dst = wind->winfo;
 	XA_WIDGET *widg;
+	bool changed = false;
 
 	if (info)
 	{
 		int i;
 
-		for (i = 0; i < (sizeof(wind->winfo)-1) && (*dst++ = *info++); i++)
-			;
+		for (i = 0; i < (sizeof(wind->winfo)-1); i++)
+		{
+			char c = *info++;
+
+			if (*dst != c)
+				changed = true;
+			*dst++ = c;
+			if (!c)
+				break;
+		}
 	}
+	else if (*dst)
+		changed = true;
 	*dst = '\0';
 
 	widg = get_widget(wind, XAW_INFO);
@@ -783,7 +806,8 @@ set_window_info(struct xa_window *wind, const char *info, bool redraw)
 
 	DIAG((D_wind, wind->owner, "    -   %s", wind->winfo));
 
-	if (redraw && (wind->active_widgets & INFO) && (wind->window_status & (XAWS_OPEN|XAWS_SHADED|XAWS_ICONIFIED|XAWS_HIDDEN)) == XAWS_OPEN)
+	/* redraw only if the text actually changed (clocks, progress lines) */
+	if (redraw && changed && (wind->active_widgets & INFO) && (wind->window_status & (XAWS_OPEN|XAWS_SHADED|XAWS_ICONIFIED|XAWS_HIDDEN)) == XAWS_OPEN)
 	{
 		GRECT clip;
 
