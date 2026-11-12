@@ -63,6 +63,8 @@ void drag_box(struct xa_client *client, GRECT start,
               const GRECT *dist,
               GRECT *last);
 
+void zoom_box(struct xa_vdi_settings *v, bool grow, const GRECT *s, const GRECT *b);
+
 AES_function
 	XA_xa_graf_mouse,
 	XA_graf_handle,

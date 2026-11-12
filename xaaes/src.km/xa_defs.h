@@ -197,7 +197,6 @@
 #define ICON_W			0x0010	/* (ex widgets.c) */
 #define ICON_H			0x0010
 
-#define GRAF_STEPS		10	/* Number of intermediate steps in a graf_growbox(), etc */
 
 #define PUSH3D_DISTANCE		1	/* Distance text on selected (pushed in) 3D objects will move */
 #define SHADOW_OFFSET		2	/* Offset used for shadowing objects */

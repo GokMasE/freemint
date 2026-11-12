@@ -493,133 +493,150 @@ XA_graf_slidebox(int lock, struct xa_client *client, AESPB *pb)
 	return XAC_DONE;
 }
 
-#if 0
-/* If shrinkbox isnt there, why then growbox? or move_box? */
+/*
+ * graf_movebox / graf_growbox / graf_shrinkbox (and form_dial FMD_GROW/SHRINK)
+ *
+ * Same behaviour as the Atari AES (DRI GEM gr_movebox/gr_growbox/gr_shrinkbox):
+ * logarithmic step count, dotted XOR outlines aligned to the pixel grid,
+ * corner-only outlines while zooming, and all outlines drawn first then
+ * XORed away again in a second pass.
+ */
+static void
+gr_scale(short xd, short yd, short *cnt, short *xs, short *ys)
+{
+	short i, d = (xd + yd) / 2;
+
+	for (i = 0; d; i++)
+		d /= 2;
+	*cnt = i;
+	*xs = i && xd / i > 1 ? xd / i : 1;
+	*ys = i && yd / i > 1 ? yd / i : 1;
+}
+
+/* dotted polyline; pattern picked per segment so dots match a dithered desktop */
+static void
+xor_line(struct xa_vdi_settings *v, short n, short *p)
+{
+	static const unsigned short hz[2] = { 0x5555, 0xaaaa };
+	static const unsigned short vt[4] = { 0x5555, 0xaaaa, 0xaaaa, 0x5555 };
+
+	for (; --n > 0; p += 2)
+	{
+		(*v->api->l_udsty)(v, p[0] == p[2] ? vt[(p[0] & 1) | ((p[1] & 1) << 1)] : hz[p[1] & 1]);
+		(*v->api->line)(v, p[0], p[1], p[2], p[3], G_BLACK);
+	}
+}
+
+/* draw cnt+1 outlines from r stepping by -xs/-ys (growing by 2*step if zoom), then erase them */
+static void
+xor_trail(struct xa_vdi_settings *v, short cnt, const GRECT *r, short xs, short ys, bool zoom)
+{
+	short pass, n, x, y, w, h, x2, y2, wa = 2 * screen.c_max_w, ha = 2 * screen.c_max_h;
+	GRECT clip;
+
+	(*v->api->save_clip)(v, &clip);
+	(*v->api->set_clip)(v, &v->screen);
+	(*v->api->wr_mode)(v, MD_XOR);
+	(*v->api->l_type)(v, USERLINE);
+	hidem();
+	for (pass = 0; pass < 2; pass++)
+	{
+		x = r->g_x, y = r->g_y, w = r->g_w, h = r->g_h;
+		for (n = cnt; n >= 0; n--)
+		{
+			x2 = x + w - 1, y2 = y + h - 1;
+			if (zoom)
+			{
+				short c[4][6] = {
+					{ x, y + ha,           x, y,    x + wa, y },
+					{ x2 + 1 - wa, y,      x2, y,   x2, y + ha },
+					{ x2, y2 + 1 - ha,     x2, y2,  x2 + 1 - wa, y2 },
+					{ x + wa, y2,          x, y2,   x, y2 + 1 - ha } };
+				xor_line(v, 3, c[0]); xor_line(v, 3, c[1]);
+				xor_line(v, 3, c[2]); xor_line(v, 3, c[3]);
+				w += 2 * xs, h += 2 * ys;
+			}
+			else
+			{
+				short b[10] = { x, y, x2, y, x2, y2, x, y2, x, y };
+				xor_line(v, 5, b);
+			}
+			x -= xs, y -= ys;
+		}
+	}
+	showm();
+	(*v->api->l_type)(v, SOLID);
+	(*v->api->l_udsty)(v, 0xffff);
+	(*v->api->wr_mode)(v, MD_TRANS);
+	(*v->api->restore_clip)(v, &clip);
+}
+
+static void
+move_box(struct xa_vdi_settings *v, short w, short h, short sx, short sy, short dx, short dy)
+{
+	short cnt, xs, ys, sgx = sx < dx ? -1 : 1, sgy = sy < dy ? -1 : 1;
+	GRECT r;
+
+	r.g_x = sx, r.g_y = sy, r.g_w = w, r.g_h = h;
+	gr_scale(sgx * (sx - dx), sgy * (sy - dy), &cnt, &xs, &ys);
+	xor_trail(v, cnt, &r, sgx * xs, sgy * ys, false);
+}
+
+/* grow: small box s moves to the centre of big box b, then zooms out to b; shrink: the reverse */
+void
+zoom_box(struct xa_vdi_settings *v, bool grow, const GRECT *s, const GRECT *b)
+{
+	short cnt, xs, ys;
+	GRECT c = *s;
+
+	c.g_x = b->g_w / 2 - s->g_w / 2;
+	c.g_y = b->g_h / 2 - s->g_h / 2;
+	gr_scale(c.g_x, c.g_y, &cnt, &xs, &ys);
+	c.g_x += b->g_x, c.g_y += b->g_y;
+
+	if (grow)
+	{
+		move_box(v, s->g_w, s->g_h, s->g_x, s->g_y, c.g_x, c.g_y);
+		xor_trail(v, cnt, &c, xs, ys, true);
+	}
+	else
+	{
+		xor_trail(v, cnt, b, -xs, -ys, true);
+		move_box(v, s->g_w, s->g_h, c.g_x, c.g_y, s->g_x, s->g_y);
+	}
+}
+
+unsigned long
+XA_graf_movebox(int lock, struct xa_client *client, AESPB *pb)
+{
+	short *i = pb->intin;
+
+	CONTROL(6,1,0)
+
+	move_box(client->vdi_settings, i[0], i[1], i[2], i[3], i[4], i[5]);
+	pb->intout[0] = 1;
+	return XAC_DONE;
+}
+
 unsigned long
 XA_graf_growbox(int lock, struct xa_client *client, AESPB *pb)
 {
 	CONTROL(8,1,0)
 
-	int x = pb->intin[0];
-	int y = pb->intin[1];
-	int w = pb->intin[2];
-	int h = pb->intin[3];
-	int xe = pb->intin[4];
-	int ye = pb->intin[5];
-	int we = pb->intin[6];
-	int he = pb->intin[7];
-	short dx, dy, dw, dh;
-	int f;
-
-	dx = (xe - x) / GRAF_STEPS;
-	dy = (ye - y) / GRAF_STEPS;
-	dw = (we - w) / GRAF_STEPS;
-	dh = (he - h) / GRAF_STEPS;
-
-	wr_mode(MD_XOR);
-
-	hidem();
-
-	for (f = 0; f < GRAF_STEPS; f++)
-	{
-		draw_2d_box(x, y, w, h, 1, G_BLACK);	/* Draw initial growing outline */
-		x += dx;
-		y += dy;
-		w += dw;
-		h += dh;
-#if 0
-		if (f % 2)
-			Vsync();
-#endif
-	}
-
-	x = pb->intin[0]; 					/* Reset to initial area */
-	y = pb->intin[1];
-	w = pb->intin[2];
-	h = pb->intin[3];
-
-	for (f = 0; f < GRAF_STEPS; f++)	/* Erase growing outline */
-	{
-		draw_2d_box(x, y, w, h, 1, G_BLACK);
-		x += dx;
-		y += dy;
-		w += dw;
-		h += dh;
-#if 0
-		if (f % 2)
-			Vsync();
-#endif
-	}
-
-	showm();
-
-	wr_mode(MD_TRANS);
-
+	zoom_box(client->vdi_settings, true, (const GRECT *)&pb->intin[0], (const GRECT *)&pb->intin[4]);
 	pb->intout[0] = 1;
-
-DIAG((D_graf,client->pid,"_growbox"));
-
 	return XAC_DONE;
 }
-
 
 unsigned long
-XA_graf_movebox(int lock, struct xa_client *client, AESPB *pb)
+XA_graf_shrinkbox(int lock, struct xa_client *client, AESPB *pb)
 {
-	int w = pb->intin[0];
-	int h = pb->intin[1];
-	int x = pb->intin[2];
-	int y = pb->intin[3];
-	int xe = pb->intin[4];
-	int ye = pb->intin[5];
-	short dx, dy;
-	int f;
+	CONTROL(8,1,0)
 
-	CONTROL(6,1,0)
-
-	dx = (xe - x) / GRAF_STEPS;
-	dy = (ye - y) / GRAF_STEPS;
-
-	wr_mode(MD_XOR);
-
-	hidem();
-
-	for (f = 0; f < GRAF_STEPS; f++)	/* Draw initial images */
-	{
-		draw_2d_box(x, y, w, h, 1, G_BLACK);
-		x += dx;
-		y += dy;
-#if 0
-		if (f % 2)
-			Vsync();
-#endif
-	}
-
-	x = pb->intin[2]; 				/* Reset to go back over same area */
-	y = pb->intin[3];
-
-	for (f = 0; f < GRAF_STEPS; f++)	/* Erase them again */
-	{
-		draw_2d_box(x, y, w, h, 1, G_BLACK);
-		x += dx;
-		y += dy;
-#if 0
-		if (f % 2)
-			Vsync();
-#endif
-	}
-
-	showm();
-
-	wr_mode(MD_TRANS);
-
+	zoom_box(client->vdi_settings, false, (const GRECT *)&pb->intin[0], (const GRECT *)&pb->intin[4]);
 	pb->intout[0] = 1;
-
-DIAG((D_graf,client->pid,"_movebox"));
-
 	return XAC_DONE;
 }
-#endif
 
 /*
  * standard GEM arrow
