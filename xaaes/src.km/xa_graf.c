@@ -609,7 +609,7 @@ zoom_box(struct xa_vdi_settings *v, bool grow, const GRECT *s, const GRECT *b)
 unsigned long
 XA_graf_movebox(int lock, struct xa_client *client, AESPB *pb)
 {
-	short *i = pb->intin;
+	const short *i = pb->intin;
 
 	CONTROL(6,1,0)
 
