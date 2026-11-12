@@ -92,6 +92,15 @@
 
 #KERN_SLICES=2
 
+# KBD_ASYNC controls when keyboard scancodes are translated into
+# characters. With the default (no), this is done right in the
+# keyboard interrupt, like TOS does, so typed keys are never late or
+# lost, even on a busy 8 MHz ST. KBD_ASYNC=yes restores the old
+# behaviour, where scancodes are translated at the next process
+# switch. Only use it if the default gives you trouble.
+
+#KBD_ASYNC=no
+
 # KERN_DEBUG_LEVEL controls output of global debugging information.
 # The higher the level, the more stuff MiNT will spew about about
 # what it's doing.
