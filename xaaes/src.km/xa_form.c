@@ -916,13 +916,10 @@ XA_form_dial(int lock, struct xa_client *client, AESPB *pb)
 		break;
 	}
 	case FMD_GROW:
-	{
-		break;
-	}
 	case FMD_SHRINK:
-	{
+		zoom_box(client->vdi_settings, pb->intin[0] == FMD_GROW,
+			 (const GRECT *)&pb->intin[1], (const GRECT *)&pb->intin[5]);
 		break;
-	}
 	case FMD_FINISH:
 	{
 		DIAG((D_form,client,"form_dial(FMD_FINISH) for %s", c_owner(client)));
