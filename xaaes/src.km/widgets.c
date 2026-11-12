@@ -2592,6 +2592,19 @@ click_scroll(int lock, struct xa_window *wind, struct xa_widget *widg, const str
 	short my = md->y;
 	short mb = md->state;
 
+	/*
+	 * Button released while the arrow/page widget was repeating:
+	 * XA_button_event() has copied the release packet (state == 0)
+	 * into widget_active.m, so 'reverse' above is false here. Just
+	 * end the action instead of sending one more (wrong-direction
+	 * for right-button) WM_ARROWED step.
+	 */
+	if (!md->state && !md->cstate)
+	{
+		cancel_widget_active(wind, 2);
+		return true;
+	}
+
 	if (!(   widget_active.widg
 	      && slider
 	      && slider->stuff.sl
