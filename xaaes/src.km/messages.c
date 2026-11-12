@@ -668,7 +668,14 @@ send_a_message(int lock, struct xa_client *dest_client, short amq, short qmf, un
 
 	if (amq != AMQ_IREDRAW  && !(amq & AMQ_ANYCASE))
 	{
-		if (dest_client->status & (CS_LAGGING | CS_FORM_ALERT | CS_FORM_DO | CS_FSEL_INPUT))
+		/*
+		 * Clients that cannot reach evnt_multi() right now get their
+		 * WM_REDRAWs serviced by the AES (grey fill + lost-redraw queue).
+		 * CS_BLOCK_MENU_NAV: client is blocked inside menu_popup()/form_popup().
+		 * Without it, a submenu closing over the caller's window stalls
+		 * all mouse movement until redraw_timeout expires (upstream issue 332).
+		 */
+		if (dest_client->status & (CS_LAGGING | CS_FORM_ALERT | CS_FORM_DO | CS_FSEL_INPUT | CS_BLOCK_MENU_NAV))
 		{
 			if (msg->m[0] == WM_REDRAW)
 			{
