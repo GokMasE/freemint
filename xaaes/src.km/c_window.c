@@ -3415,12 +3415,23 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 		wa.g_w = wind->wa.g_w;
 		wa.g_h = wind->wa.g_h;
 
-		/* increase width of workarea by vslider-width if toolbar installed */
-		if( (wind->active_widgets & TOOLBAR) && (wind->active_widgets & VSLIDE) )
+		/*
+		 * A toolbar spans the full window width: it also covers the
+		 * top of the right-hand widget column (vertical slider and/or
+		 * sizer), past the right edge of the work area. Widen the area
+		 * that is blitted or redrawn up to the inside of the window
+		 * frame, so that strip of the toolbar gets its redraw whatever
+		 * widgets make up the column. The redraws sent for this area
+		 * are clipped to the work area and the toolbar, so the rest of
+		 * the column is not affected.
+		 */
+		if (usertoolbar_installed(wind))
 		{
-			XA_WIDGET *widg = get_widget(wind, XAW_VSLIDE);
-			wa.g_w += widg->ar.g_w;
- 		}
+			short right = wind->outer.g_x + wind->outer.g_w - new->g_x;
+
+			if (right > wa.g_x + wa.g_w)
+				wa.g_w = right - wa.g_x;
+		}
 
 		/*
 		 * Convert to relative coords
