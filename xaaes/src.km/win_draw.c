@@ -2058,8 +2058,15 @@ d_waframe(struct xa_window *wind, const GRECT *clip)
 		(*vapi->br_hook)(v, 2, &wa, sc);
 		(*vapi->br_hook)(v, 1, &wa, lc);
 
-		/* fill gap between upper toolbar and wa */
-		if( (wind->active_widgets & TOOLBAR) )
+		/*
+		 * fill gap between upper toolbar and wa
+		 *
+		 * Not for an application toolbar (WF_TOOLBAR): as in AES 4.1,
+		 * that is a full-width band above the work area, not part of
+		 * it, and it covers this gap itself. Only the real work area
+		 * (rwa) below it is framed, by the lines drawn above.
+		 */
+		if( (wind->active_widgets & TOOLBAR) && !(wind->dial & created_for_TOOLBAR) )
 		{
 			if( (wind->active_widgets & VSLIDE) )
 			{
