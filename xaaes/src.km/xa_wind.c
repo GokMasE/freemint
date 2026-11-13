@@ -978,6 +978,28 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					w->rwa.g_w -= vslw;
 				}
 
+				/*
+				 * The arrows and the sizer in the right-hand column
+				 * sit beside the real work area, below the toolbar.
+				 * Keep the window tall enough for them to fit there,
+				 * so they can't be pushed up into the toolbar.
+				 */
+				if (!(w->window_status & (XAWS_SHADED|XAWS_ICONIFIED)))
+				{
+					static const short colw[] = { XAW_UPLN1, XAW_UPLN, XAW_DNLN, XAW_RESIZE };
+					short i, minh = w->r.g_h - w->rwa.g_h;
+
+					for (i = 0; i < (short)(sizeof(colw) / sizeof(colw[0])); i++)
+					{
+						XA_WIDGET *cw = get_widget(w, colw[i]);
+
+						if (wdg_is_inst(cw))
+							minh += cw->ar.g_h;
+					}
+					if (w->min.g_h < minh)
+						w->min.g_h = minh;
+				}
+
 				if( w->r.g_h < w->min.g_h )	/* height may too small for toolbar */
 				{
 					move_window(lock, w, true, -1L, w->r.g_x, w->r.g_y, w->r.g_w, w->min.g_h);
