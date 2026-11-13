@@ -2061,9 +2061,20 @@ d_waframe(struct xa_window *wind, const GRECT *clip)
 		/* fill gap between upper toolbar and wa */
 		if( (wind->active_widgets & TOOLBAR) )
 		{
+			/*
+			 * The toolbar also spans the right-hand column, which a
+			 * sizer creates even without a vertical slider. Frame
+			 * that column too, or the frame's right edge cuts
+			 * through the toolbar.
+			 */
 			if( (wind->active_widgets & VSLIDE) )
 			{
 				XA_WIDGET *widg = get_widget(wind, XAW_VSLIDE);
+				wa.g_w += widg->ar.g_w;
+			}
+			else if( (wind->active_widgets & SIZER) )
+			{
+				XA_WIDGET *widg = get_widget(wind, XAW_RESIZE);
 				wa.g_w += widg->ar.g_w;
 			}
 
