@@ -915,11 +915,16 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					widg2->ar.g_y -= d;
 				}
 
-				if( !w->thinwork && md == 0 )
-				{
-					w->wa.g_y -= 2;
-					w->wa.g_h += 2;
-				}
+				/*
+				 * The toolbar is a full-width band right below the
+				 * window's widget rows: it also covers the margin
+				 * the work area's frame leaves above the work area.
+				 * The frame is drawn only around the real work area
+				 * below it. Place a replacement toolbar the same way,
+				 * so it never overlaps that frame.
+				 */
+				w->wa.g_h += w->wa.g_y - w->inner.g_y;
+				w->wa.g_y = w->inner.g_y;
 				w->wa.g_x = w->r.g_x;
 
 				wt = obtree_to_wt(client, ob);

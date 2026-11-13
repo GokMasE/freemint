@@ -3427,10 +3427,28 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 		 */
 		if (usertoolbar_installed(wind))
 		{
+			XA_WIDGET *tb = get_widget(wind, XAW_TOOLBAR);
 			short right = wind->outer.g_x + wind->outer.g_w - new->g_x;
+			short left = (tb->ar.g_x > wind->inner.g_x ? tb->ar.g_x : wind->inner.g_x) - new->g_x;
+			short top = tb->ar.g_y - new->g_y;
 
 			if (right > wa.g_x + wa.g_w)
 				wa.g_w = right - wa.g_x;
+			/*
+			 * An application toolbar also covers the work area's
+			 * frame margin above and left of the work area (see
+			 * WF_TOOLBAR in xa_wind.c), so include that too.
+			 */
+			if (left < wa.g_x)
+			{
+				wa.g_w += wa.g_x - left;
+				wa.g_x = left;
+			}
+			if (top < wa.g_y)
+			{
+				wa.g_h += wa.g_y - top;
+				wa.g_y = top;
+			}
 		}
 
 		/*
