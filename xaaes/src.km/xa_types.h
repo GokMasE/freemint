@@ -2739,6 +2739,7 @@ struct config
 	short xaw_point;	/* Font id to use (XaAES-window-content) */
 	short double_click_time;	/* Double click timing */
 	short mouse_packet_timegap;
+	short drag_threshold;		/* Pixels moved with button held before a click becomes a drag */
 	short redraw_timeout;
 
 	union {
