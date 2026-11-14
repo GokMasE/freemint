@@ -206,6 +206,7 @@
 #define ICONIFIED_H		72
 
 #define DOUBLE_CLICK_TIME	(250 / 5)	/* Default double click time in timer ticks (0-200) */
+#define DRAG_THRESHOLD		 3	/* Pixels the mouse must move with a button held to start a drag without waiting for the double click time (0 = off) */
 #define MOUSE_PACKET_TIMEGAP	 3	/* Amount of time that have to pass between two packets received from the VDI */
 #define RT_SCROLL_STEP		10	/* Step when doing a real-time scroll (0-1000) */
 

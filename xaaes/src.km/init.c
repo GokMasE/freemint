@@ -285,6 +285,7 @@ static void configure(void)
 	cfg.xaw_point = STANDARD_FONT_POINT;	/* fnt-sz for xaaes-windows */
 	cfg.double_click_time = DOUBLE_CLICK_TIME;
 	cfg.mouse_packet_timegap = MOUSE_PACKET_TIMEGAP;
+	cfg.drag_threshold = DRAG_THRESHOLD;
 	cfg.redraw_timeout = 500;
 	cfg.standard_font_point = STANDARD_FONT_POINT;	/* Size for normal text */
 	cfg.info_font_point = -1;

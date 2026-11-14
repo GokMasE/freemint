@@ -162,6 +162,7 @@ long _cdecl		init		(struct kentry *k, struct adiinfo *ai, char **reason) __asm__
 
 #define MAX_DC_TIME	200
 #define MAX_TIMEGAP	20
+#define MAX_DRAG_THRESHOLD	50
 #define SYSTIMER	0x4baL
 #define SYSVBI		0x456L
 #define SYSNVBI		0x454L
@@ -191,6 +192,7 @@ static short r_clicks;
 
 static short timeout;
 static short dc_time;
+static short drag_threshold;
 static short last_state;
 static short last_time;
 static short halve;
@@ -320,6 +322,32 @@ cmotv(void)
 	(*ainf->move)(&moose_aif, sample_x, sample_y);
 }
 
+/*
+ * A pending button packet is normally held back for the whole double-click
+ * time, so a second click can be added to it. If a button is still held and
+ * the mouse has moved more than drag_threshold pixels from where it was
+ * pressed, the user is dragging, not clicking: send the packet now so the
+ * drag starts immediately instead of after the double-click time.
+ * A drag_threshold of 0 disables this.
+ */
+static void
+chk_drag_threshold(void)
+{
+	if (timeout && last_state && drag_threshold)
+	{
+		short dx = sample_x - click_x;
+		short dy = sample_y - click_y;
+
+		if (dx < 0)
+			dx = -dx;
+		if (dy < 0)
+			dy = -dy;
+
+		if (dx > drag_threshold || dy > drag_threshold)
+			do_button_packet();
+	}
+}
+
 static void
 chk_but_timeout(short tm)
 {
@@ -344,6 +372,7 @@ timer_handler(void)
 
 		if (!inbuf)
 		{
+			chk_drag_threshold();
 			chk_but_timeout(*(long*)(SYSTIMER));
 		}
 		else
@@ -496,6 +525,7 @@ moose_open (struct adif *a)
 	moose_inuse	= 0;
 	dc_time		= 50; /* DOUBLE_CLICK_TIME */
 	pkt_timegap	= 3;  /* MOUSE_PACKET_TIMEGAP */
+	drag_threshold	= 3;  /* DRAG_THRESHOLD */
 	click_count	= 0;
 	for (i = 0; i < 16; i++)
 		clicks.chars[i] = 0;
@@ -554,6 +584,15 @@ moose_ioctl (struct adif *a, short cmd, long arg)
 			pkt_timegap = MAX_TIMEGAP;
 		else
 			pkt_timegap = arg;
+		break;
+
+	case MOOSE_DRAG_THRESHOLD:
+		if (arg < 0)
+			drag_threshold = 0;
+		else if (arg > MAX_DRAG_THRESHOLD)
+			drag_threshold = MAX_DRAG_THRESHOLD;
+		else
+			drag_threshold = arg;
 		break;
 
 	default:

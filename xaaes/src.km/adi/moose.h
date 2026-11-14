@@ -78,6 +78,7 @@ struct mooses_data
 #define MOOSE_READVECS		(('M'<< 8) | 0)	/* buf is ptr to struct moose_vecsbuf */
 #define MOOSE_DCLICK		(('M'<< 8) | 1)	/* buf is ptr to unsigned short */
 #define MOOSE_PKT_TIMEGAP	(('M'<< 8) | 2)
+#define MOOSE_DRAG_THRESHOLD	(('M'<< 8) | 3)	/* pixels moved with a button held before a pending click is sent as a drag; 0 = off */
 
 typedef short vdi_vec(void *, ...);
 

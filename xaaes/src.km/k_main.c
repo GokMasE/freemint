@@ -694,6 +694,10 @@ init_moose(void)
 				if (adi_ioctl(G.adi_mouse, MOOSE_PKT_TIMEGAP, (long)cfg.mouse_packet_timegap))
 					display(/*0000000e*/"Moose set mouse-packets time-gap failed");
 
+				/* Older moose.adi does not know this; just log it */
+				if (adi_ioctl(G.adi_mouse, MOOSE_DRAG_THRESHOLD, (long)cfg.drag_threshold))
+					BLOG((false, "Moose set drag threshold failed (old moose.adi?)"));
+
 				BLOG((false, "Using moose adi"));
 				ret = true;
 			}
