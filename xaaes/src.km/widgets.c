@@ -361,6 +361,12 @@ rp2ap_obtree(struct xa_window *wind, struct xa_widget *widg, GRECT *r)
 				{
 					obtree->ob_x += wt->ox;
 					obtree->ob_y += wt->oy;
+					/* an application toolbar's outside frame is part of the widget */
+					if (widg->m.r.xaw_idx == XAW_TOOLBAR)
+					{
+						obtree->ob_width -= 2 * wt->ox;
+						obtree->ob_height -= 2 * wt->oy;
+					}
 				}
 			}
 		}
@@ -622,7 +628,7 @@ init_widget_tree(struct xa_client *client, struct widget_tree *wt, OBJECT *obtre
 	obj_area(wt, aesobj(obtree, 0), &r);
 
 	wt->ox = obtree->ob_x - r.g_x;
-	wt->oy = obtree->ob_y - r.g_x;
+	wt->oy = obtree->ob_y - r.g_y;
 
 	if (wt->ox < 0)
 		wt->ox = 0;

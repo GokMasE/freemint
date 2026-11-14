@@ -876,16 +876,27 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 
 				DIAGS(("  --- Set new toolbar"));
 
+				/*
+				 * The toolbar's height includes the outside frame of
+				 * its root object (wt->oy on each side), as in other AESes.
+				 */
 				if( md == 1 /*&& ob != o*/ )	/* changed toolbar */
 				{
-					OBJECT *o = widg->stuff.wt->tree;
-					d = o->ob_height - ob->ob_height;
+					XA_TREE *owt = widg->stuff.wt;
+					d = owt->tree->ob_height + 2 * owt->oy;
 					remove_widget(lock, w, XAW_TOOLBAR);
 				}
 				else	/* new toolbar */
 				{
-					d = -ob->ob_height;
+					d = 0;
 				}
+
+				wt = obtree_to_wt(client, ob);
+				if (!wt)
+					wt = new_widget_tree(client, ob);
+				assert(wt);
+
+				d -= ob->ob_height + 2 * wt->oy;
 				/* correct real work-area and min.h */
 				w->min.g_h -= d;
 				w->rwa.g_h += d;
@@ -922,13 +933,11 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				}
 				w->wa.g_x = w->r.g_x;
 
-				wt = obtree_to_wt(client, ob);
-				if (!wt)
-					wt = new_widget_tree(client, ob);
-				assert(wt);
-
-				widg->r.g_w = widg->ar.g_w = ob->ob_width = or.g_w = w->r.g_w;
-				widg->ar.g_x = ob->ob_x = w->r.g_x;
+				widg->r.g_w = widg->ar.g_w = or.g_w = w->r.g_w;
+				widg->ar.g_x = w->r.g_x;
+				/* the root object sits inside its outside frame */
+				ob->ob_width = w->r.g_w - 2 * wt->ox;
+				ob->ob_x = w->r.g_x + wt->ox;
 
 				/* if( md == 1 ) */	/* changed */
 				{
@@ -939,7 +948,13 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				}
 
 				obj_rectangle(wt, aesobj(ob, 0), &or);
-				wt = set_toolbar_widget(lock, w, client, ob, aesobj(ob, pb->intin[5]), 0, STW_ZEN, NULL, &or);
+				or.g_w += 2 * wt->ox;
+				or.g_h += 2 * wt->oy;
+				/*
+				 * Not STW_ZEN: an application toolbar is drawn as designed,
+				 * including the frame and outline of its root object.
+				 */
+				wt = set_toolbar_widget(lock, w, client, ob, aesobj(ob, pb->intin[5]), 0, 0, NULL, &or);
 
 				rp_2_ap_cs(w, widg, NULL);
 				if (wt && wt->tree)
@@ -961,7 +976,8 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					widg->start = pb->intin[4];
 					obj_edit(wt, w->vdi_settings, ED_INIT, edobj, 0,0, NULL, false, NULL,NULL, NULL,NULL);
 
-					ob->ob_width = widg->ar.g_w = w->r.g_w;
+					widg->ar.g_w = w->r.g_w;
+					ob->ob_width = w->r.g_w - 2 * wt->ox;
 					/* kludge: avoid garbage ... todo: draw frame */
 					(*v->api->f_color)(v, objc_rend.dial_colours.bg_col);
 					(*v->api->f_interior)(v, FIS_SOLID);
