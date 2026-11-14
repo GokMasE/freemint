@@ -151,6 +151,19 @@ struct	cad_def cad[3];		/* for halt, warm and cold resp. */
 
 int	has_kbdvec = false;	/* true if kbdvec present */
 
+/* Where scancodes are translated (mint.cnf: KBD_ASYNC).
+ *
+ * 0 (default): directly in the keyboard interrupt, like TOS does. The
+ *    ASCII code is in the BIOS keyboard buffer as soon as the IKBD byte
+ *    has arrived, whatever the CPU is doing.
+ * 1: deferred to a root timeout, i.e. to the next context switch. This
+ *    is the old behaviour. On slow machines (8 MHz 68000) the next
+ *    context switch can be far away (e.g. while an AES or the kernel is
+ *    busy in supervisor mode), so keys arrive late and the small
+ *    scancode queue below overflows and drops keys.
+ */
+bool	kbd_async = false;
+
 /* Auxiliary variables for ikbd_scan() */
 static	short cad_lock;		/* semaphore to avoid scheduling shutdown() twice */
 static	short kbd_lock;		/* semaphore to temporarily block the keyboard processing */
@@ -247,7 +260,7 @@ mouse_up(PROC *p, long pixels)
 		else
 			to = 10;
 
-		m_to = addroottimeout(to, mouse_up, 0);
+		m_to = addroottimeout(to, mouse_up, 1);
 		if (m_to) m_to->arg = pixels;
 	}
 	else
@@ -275,7 +288,7 @@ mouse_down(PROC *p, long pixels)
 		else
 			to = 10; //krpdel;
 
-		m_to = addroottimeout(to, mouse_down, 0);
+		m_to = addroottimeout(to, mouse_down, 1);
 		if (m_to) m_to->arg = pixels;
 	}
 	else
@@ -303,7 +316,7 @@ mouse_left(PROC *p, long pixels)
 		else
 			to = 10; //krpdel;
 
-		m_to = addroottimeout(to, mouse_left, 0);
+		m_to = addroottimeout(to, mouse_left, 1);
 		if (m_to) m_to->arg = pixels;
 	}
 	else
@@ -332,7 +345,7 @@ mouse_right(PROC *p, long pixels)
 		else
 			to = 10; //krpdel;
 
-		m_to = addroottimeout(to, mouse_right, 0);
+		m_to = addroottimeout(to, mouse_right, 1);
 		if (m_to) m_to->arg = pixels;
 	}
 	else
@@ -394,7 +407,7 @@ mouse_dclick(PROC *p, long arg)
 	mouse_noclick(p, arg);
 
 	mbuttons_state |= MOUSE_LBUTTON_DOWN;
-	addroottimeout(MOUSE_TIMEOUT, mouse_lclick, 0);
+	addroottimeout(MOUSE_TIMEOUT, mouse_lclick, 1);
 }
 
 static void
@@ -431,9 +444,21 @@ static void put_key_into_buf(IOREC_T *iorec, uchar c0, uchar c1, uchar c2, uchar
 static void
 kbd_repeat(PROC *p, long arg)
 {
-	put_key_into_buf(last_iorec, last_key[0], last_key[1], last_key[2], last_key[3]);
-	kbdclick(last_key[1]);
-	k_to = addroottimeout(keyrep_time, kbd_repeat, 1);
+	/* Keys may be processed in the keyboard interrupt (see kbd_async),
+	 * so keep it out while we touch the buffer and k_to. If the key
+	 * was released after this timeout expired but before we got here,
+	 * set_keyrepeat_timeout() has cleared k_to: don't repeat then.
+	 */
+	ushort sr = spl7();
+
+	if (k_to)
+	{
+		put_key_into_buf(last_iorec, last_key[0], last_key[1], last_key[2], last_key[3]);
+		kbdclick(last_key[1]);
+		k_to = addroottimeout(keyrep_time, kbd_repeat, 1);
+	}
+
+	spl(sr);
 }
 
 static void
@@ -506,7 +531,7 @@ generate_mouse_event(uchar shift, ushort scan, ushort make)
 			{
 				/* Generate "release" packet */
 				mbuttons_state &= ~MOUSE_LBUTTON_DOWN;
-				addroottimeout(MOUSE_TIMEOUT, mouse_noclick, 0);
+				addroottimeout(MOUSE_TIMEOUT, mouse_noclick, 1);
 			}
 
 			return -1;
@@ -524,7 +549,7 @@ generate_mouse_event(uchar shift, ushort scan, ushort make)
 			{
 				/* Generate "release" packet */
 				mbuttons_state &= ~MOUSE_RBUTTON_DOWN;
-				addroottimeout(MOUSE_TIMEOUT, mouse_noclick, 0);
+				addroottimeout(MOUSE_TIMEOUT, mouse_noclick, 1);
 			}
 
 			return -1;
@@ -610,6 +635,7 @@ static void
 put_key_into_buf(IOREC_T *iorec, uchar c0, uchar c1, uchar c2, uchar c3)
 {
 	char *new_buf_pos;
+	short new_tail;
 
 # if 0
 	/* bit 2 of conterm variable decides, whether we
@@ -620,17 +646,22 @@ put_key_into_buf(IOREC_T *iorec, uchar c0, uchar c1, uchar c2, uchar c3)
 # endif
 // 	display("c0 %x, c1 %x, c2 %x, c3 %x", c0, c1, c2, c3);
 
-	iorec->tail += 4;
-	if (iorec->tail >= iorec->buflen)
-		iorec->tail = 0;
+	new_tail = iorec->tail + 4;
+	if (new_tail >= iorec->buflen)
+		new_tail = 0;
 
 	/* Precalculating this saves some memory */
-	new_buf_pos = iorec->bufaddr + iorec->tail;
+	new_buf_pos = iorec->bufaddr + new_tail;
 
 	*new_buf_pos++ = c0;
 	*new_buf_pos++ = c1;
 	*new_buf_pos++ = c2;
 	*new_buf_pos++ = c3;
+
+	/* Publish the new tail only once the entry is complete, so a reader
+	 * interrupted by us never sees a half-written or transient tail.
+	 */
+	iorec->tail = new_tail;
 
 	/* c1 == 0 means that this "keypress" was generated
 	 * by typing on the numpad while holding Alt down.
@@ -943,10 +974,44 @@ struct scanb_entry
 };
 
 static TIMEOUT *ikbd_to = NULL;
-static int scanb_head = 0;
-static int scanb_tail = 0;
+static volatile int scanb_head = 0;
+static volatile int scanb_tail = 0;
 static struct scanb_entry scanb[16];
 static void _cdecl IkbdScan(PROC *, long);
+
+/* Drain the scancode queue right now (interrupt or single task mode).
+ * kbdvec can be entered again while we are at it, e.g. by the IKBD
+ * interrupt while a USB keyboard driver feeds us at a lower IPL. The
+ * nested call then only queues its scancode, and we pick it up here.
+ */
+static void
+ikbd_scan_now(PROC *p)
+{
+	static volatile short busy;
+
+	if (busy)
+		return;
+	do
+	{
+		busy = 1;
+		IkbdScan(p, 1);
+		busy = 0;
+	}
+	/* While kbd_lock is set IkbdScan() leaves the queue alone */
+	while (scanb_head != scanb_tail && !kbd_lock);
+}
+
+/* kbd_async: the deferred run, called at the next context switch. */
+static void _cdecl
+ikbd_scan_timeout(PROC *p, long arg)
+{
+	/* This timeout has already fired. Clear it first, so a scancode that
+	 * arrives while (or just after) we drain the queue schedules a new
+	 * run instead of being stranded until the next key.
+	 */
+	ikbd_to = NULL;
+	ikbd_scan_now(p);
+}
 
 void _cdecl
 ikbd_scan(ushort scancode, IOREC_T *rec)
@@ -967,21 +1032,23 @@ ikbd_scan(ushort scancode, IOREC_T *rec)
 		extern short in_kernel;
 		DEBUG(("ikbd_scan directly for '%s' head=%d p_flags=%lx slices=%d in_kernel=%x", curproc->name, scanb_head, curproc->p_mem->base->p_flags, curproc->slices, in_kernel ));
 # endif
-		IkbdScan( curproc, 1);
+		ikbd_scan_now(curproc);
 	}
 	else
 # endif
 
-	if (!ikbd_to)
+	if (!kbd_async)
+		ikbd_scan_now(curproc);
+	else if (!ikbd_to)
 	{
-		ikbd_to = addroottimeout(0L, IkbdScan, 1);
+		ikbd_to = addroottimeout(0L, ikbd_scan_timeout, 1);
 	}
 }
 
 static void _cdecl
 IkbdScan(PROC *p, long arg)
 {
-	do
+	while (scanb_head != scanb_tail)
 	{
 		IOREC_T *iorec;
 		ushort scancode;
@@ -1384,9 +1451,7 @@ IkbdScan(PROC *p, long arg)
 #ifndef MILAN
 		set_keyrepeat_timeout(make);
 #endif
-	} while (scanb_head != scanb_tail);
-
-	ikbd_to = NULL;
+	}
 }
 
 /* The XBIOS' Keytbl() function
