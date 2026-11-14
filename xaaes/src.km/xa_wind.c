@@ -972,21 +972,15 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				if ( md == 1 && (w->window_status & (XAWS_OPEN|XAWS_HIDDEN|XAWS_SHADED)) == XAWS_OPEN)
 				{
 					struct xa_aes_object edobj = aesobj(wt->tree, pb->intin[5]);
-					GRECT clr;
-
 					widg->start = pb->intin[4];
 					obj_edit(wt, w->vdi_settings, ED_INIT, edobj, 0,0, NULL, false, NULL,NULL, NULL,NULL);
 
 					widg->ar.g_w = w->r.g_w;
 					set_toolbar_root_x(w, wt);
 					/* kludge: avoid garbage ... todo: draw frame */
-					/* clear only inside the window border, never over it */
-					if (xa_rect_clip(&w->outer, &widg->ar, &clr))
-					{
-						(*v->api->f_color)(v, objc_rend.dial_colours.bg_col);
-						(*v->api->f_interior)(v, FIS_SOLID);
-						(*v->api->gbar)(v, 0, &clr);
-					}
+					(*v->api->f_color)(v, objc_rend.dial_colours.bg_col);
+					(*v->api->f_interior)(v, FIS_SOLID);
+					(*v->api->gbar)(v, 0, &widg->ar);
 				}
 
 				redraw_toolbar(lock, w, 0);
