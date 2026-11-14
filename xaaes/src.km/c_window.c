@@ -1583,7 +1583,7 @@ change_window_attribs(int lock,
 				wt->tree->ob_y = w->wa.g_y;
 				if (!wt->zen)
 				{
-					wt->tree->ob_x += wt->ox;
+					set_toolbar_root_x(w, wt);
 					wt->tree->ob_y += wt->oy;
 				}
 			}
@@ -3340,7 +3340,7 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 				wt->tree->ob_y = wind->wa.g_y;
 				if (!wt->zen)
 				{
-					wt->tree->ob_x += wt->ox;
+					set_toolbar_root_x(wind, wt);
 					wt->tree->ob_y += wt->oy;
 				}
 			}

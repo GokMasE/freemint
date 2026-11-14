@@ -936,8 +936,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 				widg->r.g_w = widg->ar.g_w = or.g_w = w->r.g_w;
 				widg->ar.g_x = w->r.g_x;
 				/* the root object sits inside its outside frame */
-				ob->ob_width = w->r.g_w - 2 * wt->ox;
-				ob->ob_x = w->r.g_x + wt->ox;
+				set_toolbar_root_x(w, wt);
 
 				/* if( md == 1 ) */	/* changed */
 				{
@@ -963,7 +962,7 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					wt->tree->ob_y = w->wa.g_y;
 					if (!wt->zen)
 					{
-						wt->tree->ob_x += wt->ox;
+						set_toolbar_root_x(w, wt);
 						wt->tree->ob_y += wt->oy;
 					}
 					w->active_widgets |= TOOLBAR;
@@ -976,12 +975,18 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					widg->start = pb->intin[4];
 					obj_edit(wt, w->vdi_settings, ED_INIT, edobj, 0,0, NULL, false, NULL,NULL, NULL,NULL);
 
+					GRECT clr;
+
 					widg->ar.g_w = w->r.g_w;
-					ob->ob_width = w->r.g_w - 2 * wt->ox;
+					set_toolbar_root_x(w, wt);
 					/* kludge: avoid garbage ... todo: draw frame */
-					(*v->api->f_color)(v, objc_rend.dial_colours.bg_col);
-					(*v->api->f_interior)(v, FIS_SOLID);
-					(*v->api->gbar)(v, 0, &widg->ar);
+					/* clear only inside the window border, never over it */
+					if (xa_rect_clip(&w->outer, &widg->ar, &clr))
+					{
+						(*v->api->f_color)(v, objc_rend.dial_colours.bg_col);
+						(*v->api->f_interior)(v, FIS_SOLID);
+						(*v->api->gbar)(v, 0, &clr);
+					}
 				}
 
 				redraw_toolbar(lock, w, 0);
