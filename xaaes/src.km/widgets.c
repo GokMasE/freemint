@@ -361,6 +361,12 @@ rp2ap_obtree(struct xa_window *wind, struct xa_widget *widg, GRECT *r)
 				{
 					obtree->ob_x += wt->ox;
 					obtree->ob_y += wt->oy;
+					/* an application toolbar's outside frame is part of the widget */
+					if (widg->m.r.xaw_idx == XAW_TOOLBAR)
+					{
+						set_toolbar_root_x(wind, wt);
+						obtree->ob_height -= 2 * wt->oy;
+					}
 				}
 			}
 		}
@@ -622,7 +628,7 @@ init_widget_tree(struct xa_client *client, struct widget_tree *wt, OBJECT *obtre
 	obj_area(wt, aesobj(obtree, 0), &r);
 
 	wt->ox = obtree->ob_x - r.g_x;
-	wt->oy = obtree->ob_y - r.g_x;
+	wt->oy = obtree->ob_y - r.g_y;
 
 	if (wt->ox < 0)
 		wt->ox = 0;
@@ -4179,6 +4185,18 @@ redraw_toolbar(int lock, struct xa_window *wind, short item)
 	(*v->api->clear_clip)(v);
 	showm();
 	widg->start = wind->winitem;
+}
+
+/*
+ * Place the root object of an application toolbar (a non-zen tree)
+ * horizontally inside the window border, leaving room for the root's
+ * outside frame, so that frame is never hidden under the window border.
+ */
+void
+set_toolbar_root_x(struct xa_window *wind, XA_TREE *wt)
+{
+	wt->tree->ob_x = wind->outer.g_x + wt->ox;
+	wt->tree->ob_width = wind->outer.g_w - 2 * wt->ox;
 }
 
 void
