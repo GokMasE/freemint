@@ -1548,7 +1548,14 @@ static void
 set_popout_timeout(Tab *tab, bool instant)
 {
 	TIMEOUT *t;
-	if (!S.popout_timeout && PREV_TAB(tab))
+	/*
+	 * Also skip while a collapse is already posted (popout_timeout_ce):
+	 * popup() calls this on every mouse move over a separator, and in the
+	 * gap between the timer firing and CE_do_collapse running, a second
+	 * timer (or, with popout_timeout = 0, a second collapse) would be
+	 * queued for the same submenu.
+	 */
+	if (!S.popout_timeout && !S.popout_timeout_ce && PREV_TAB(tab))
 	{
 		if (!instant && cfg.popout_timeout)
 		{
