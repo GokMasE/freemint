@@ -113,6 +113,7 @@ static struct parser_item parser_tab[] =
 	{ "POPSCROLL",             PI_R_S,   & cfg.popscroll		},
 	{ "DC_TIME",               PI_R_S,   & cfg.double_click_time	},
 	{ "MP_TIMEGAP",            PI_R_S,   & cfg.mouse_packet_timegap },
+	{ "DRAG_THRESHOLD",        PI_R_S,   & cfg.drag_threshold	},
 	{ "VIDEO",                 PI_R_US,  & cfg.videomode		},
 	{ "MODECODE",              PI_R_US,  & cfg.videomode		},
 	{ "SCREENDEV",             PI_R_US,  & cfg.device		},

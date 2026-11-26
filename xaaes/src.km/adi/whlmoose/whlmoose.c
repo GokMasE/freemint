@@ -166,9 +166,12 @@ long _cdecl		init		(struct kentry *k, struct adiinfo *ai, char **reason) __asm__
  * How far (in pixels) the mouse may move away from where a button was
  * pressed before the pending button event is sent at once. With the button
  * still held that is a drag (a window mover, a slider, a rubber box), which
- * must not wait for the double-click time.
+ * must not wait for the double-click time. This is the default; XaAES can
+ * change it with MOOSE_DRAG_THRESHOLD (DRAG_THRESHOLD in xaaes.cnf), and 0
+ * turns the early send off.
  */
 #define DRAG_THRESHOLD	3
+#define MAX_DRAG_THRESHOLD	50
 #define SYSTIMER	0x4baL
 #define SYSVBI		0x456L
 #define SYSNVBI		0x454L
@@ -198,6 +201,7 @@ static short r_clicks;
 
 static short timeout;
 static short dc_time;
+static short drag_threshold;
 static short last_state;
 static short last_time;
 static short halve;
@@ -333,8 +337,11 @@ dragged(void)
 	short dx = sample_x - click_x;
 	short dy = sample_y - click_y;
 
-	return dx > DRAG_THRESHOLD || dx < -DRAG_THRESHOLD ||
-	       dy > DRAG_THRESHOLD || dy < -DRAG_THRESHOLD;
+	if (!drag_threshold)
+		return 0;
+
+	return dx > drag_threshold || dx < -drag_threshold ||
+	       dy > drag_threshold || dy < -drag_threshold;
 }
 
 static void
@@ -504,6 +511,7 @@ moose_open (struct adif *a)
 	moose_inuse	= 0;
 	dc_time		= 50; /* DOUBLE_CLICK_TIME */
 	pkt_timegap	= 3;  /* MOUSE_PACKET_TIMEGAP */
+	drag_threshold	= DRAG_THRESHOLD;
 	click_count	= 0;
 	for (i = 0; i < 16; i++)
 		clicks.chars[i] = 0;
@@ -562,6 +570,15 @@ moose_ioctl (struct adif *a, short cmd, long arg)
 			pkt_timegap = MAX_TIMEGAP;
 		else
 			pkt_timegap = arg;
+		break;
+
+	case MOOSE_DRAG_THRESHOLD:
+		if (arg < 0)
+			drag_threshold = 0;
+		else if (arg > MAX_DRAG_THRESHOLD)
+			drag_threshold = MAX_DRAG_THRESHOLD;
+		else
+			drag_threshold = arg;
 		break;
 
 	default:
