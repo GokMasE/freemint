@@ -785,10 +785,14 @@ chk_button_waiter(struct moose_data *md)
 		if (C.button_waiter->status & CS_MENU_NAV)
 		{
 			/*
-			 * Presses during menu navigation belong to the menu.
-			 * Only the final all-buttons-up packet ends the app's
-			 * click-hold. Queueing a press here made the app reopen
-			 * the popup and see a stuck button state (bug #213).
+			 * The client opened a menu (a popup on a button press)
+			 * with the button still held, and the menu takes the
+			 * clicks. Pass on only the packet that has all buttons
+			 * up, so that the client knows they were released. Any
+			 * other packet (the right button pressed while the left
+			 * one is held) would reach the client as a new click once
+			 * the menu is gone, and a popup opened on a press would
+			 * open again at once.
 			 */
 			if (!md->cstate)
 			{
