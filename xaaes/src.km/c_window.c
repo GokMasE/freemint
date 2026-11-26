@@ -1583,7 +1583,7 @@ change_window_attribs(int lock,
 				wt->tree->ob_y = w->wa.g_y;
 				if (!wt->zen)
 				{
-					wt->tree->ob_x += wt->ox;
+					set_toolbar_root_x(w, wt);
 					wt->tree->ob_y += wt->oy;
 				}
 			}
@@ -3340,7 +3340,7 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 				wt->tree->ob_y = wind->wa.g_y;
 				if (!wt->zen)
 				{
-					wt->tree->ob_x += wt->ox;
+					set_toolbar_root_x(wind, wt);
 					wt->tree->ob_y += wt->oy;
 				}
 			}
@@ -3945,6 +3945,18 @@ set_and_update_window(struct xa_window *wind, bool blit, bool only_wa, GRECT *ne
 				//DIAGS(("Freeing blitrect %lx", nrl));
 				kfree(nrl);
 				//DIAGS(("kfree %lx", nrl));
+			}
+			/*
+			 * The frame of an application toolbar's root object ends at
+			 * the window's right edge, so a blitted toolbar is stale
+			 * there after a width change: redraw the toolbar.
+			 */
+			if (new->g_w != old.g_w && !(wind->window_status & XAWS_RESIZED))
+			{
+				struct xa_widget *tb = usertoolbar_installed(wind);
+
+				if (tb && tb->stuff.wt && !tb->stuff.wt->zen)
+					generate_redraws(wlock, wind, &tb->ar, RDRW_WA);
 			}
 			/*
 			 * If window was resized, redraw all window borders
