@@ -2,7 +2,7 @@
 # run.sh <snapshot.zip|dir>
 #
 # Slider painting test (fork PR 12, display_slider() in xa_wind.c).
-# For each step slidetest.prg changes sliders (some right after a
+# For each step sldtest.prg changes sliders (some right after a
 # WF_CURRXYWH resize, which leaves a frame redraw queued, the case where
 # XaAES skips the direct slider paint), or the sizer is dragged with the
 # mouse. The window as painted is then compared with the same window
@@ -17,7 +17,7 @@ SNAP="$1"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-300}"
 OUT="$HATARI_WORK"
 mkdir -p "$OUT"; rm -rf "$OUT/shots"; : > "$OUT/results.txt"
-"$HROOT/mkdisk.sh" "$SNAP" "$OUT/disk.img" "$HERE/slidetest.prg" || exit 1
+"$HROOT/mkdisk.sh" "$SNAP" "$OUT/disk.img" "$HERE/sldtest.prg" || exit 1
 trap emu_stop EXIT
 emu_start "$OUT/disk.img" || exit 1
 emu_log "booting (timeout ${BOOT_TIMEOUT}s)"

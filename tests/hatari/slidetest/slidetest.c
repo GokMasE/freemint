@@ -1,5 +1,5 @@
 /*
- * slidetest.prg - GEM app for the Hatari slider painting test.
+ * sldtest.prg (8.3 name for FAT) - GEM app for the Hatari slider painting test.
  *
  * Opens one window with both sliders, arrows, sizer and fuller. On
  * key 'n' it runs the next scripted step: it changes the sliders with
