@@ -828,13 +828,18 @@ static void
 draw_widget(struct xa_window *wind, XA_WIDGET *widg, struct xa_rect_list *rl)
 {
 	struct xa_vdi_settings *v = wind->vdi_settings;
-	GRECT r;
+	GRECT r, wa;
 
 	DIAG((D_wind, wind->owner, "draw_widget: wind handle %d, widget %d (func=%lx)",
 		wind->handle, widg->m.r.xaw_idx, (unsigned long)widg->m.r.draw));
 
 	if (!rl)
 		rl = wind->rect_list.start;
+
+	if (widg->m.r.xaw_idx == XAW_TOOLBAR)
+		toolbar_clip(wind, &wa);
+	else
+		wa = wind->wa;
 
 	if (rl)
 	{
@@ -844,7 +849,7 @@ draw_widget(struct xa_window *wind, XA_WIDGET *widg, struct xa_rect_list *rl)
 		{
 			if (widg->m.properties & WIP_WACLIP)
 			{
-				if (xa_rect_clip(&rl->r, &wind->wa, &r))
+				if (xa_rect_clip(&rl->r, &wa, &r))
 				{
 					(*v->api->set_clip)(v, &r);
 					widg->m.r.draw(wind, widg, &r);
@@ -4161,15 +4166,16 @@ redraw_toolbar(int lock, struct xa_window *wind, short item)
 	XA_WIDGET *widg = get_widget(wind, XAW_TOOLBAR);
 	struct xa_vdi_settings *v = wind->vdi_settings;
 	struct xa_rect_list *rl;
-	GRECT r;
+	GRECT r, wa;
 
 	hidem();
 	widg->start = item;
 
+	toolbar_clip(wind, &wa);
 	rl = wind->rect_list.start;
 	while (rl)
 	{
-		if (xa_rect_clip(&rl->r, &wind->wa, &r))
+		if (xa_rect_clip(&rl->r, &wa, &r))
 		{
 			(*v->api->set_clip)(v, &r);
 			widg->m.r.draw(wind, widg, &r);
@@ -4179,6 +4185,32 @@ redraw_toolbar(int lock, struct xa_window *wind, short item)
 	(*v->api->clear_clip)(v);
 	showm();
 	widg->start = wind->winitem;
+}
+
+/*
+ * The area the toolbar is drawn in. A toolbar set with wind_set(WF_TOOLBAR)
+ * is a band as wide as the window (see there), between its borders: it
+ * also covers the top of the column right of the work area (vertical
+ * slider, arrows, sizer) and the margins left for the work area frame,
+ * which frames only the work area below the toolbar. Other toolbars (the
+ * AES' own dialogs) stay within the work area.
+ */
+void
+toolbar_clip(struct xa_window *wind, GRECT *r)
+{
+	if (wind->dial & created_for_TOOLBAR)
+	{
+		XA_WIDGET *widg = get_widget(wind, XAW_TOOLBAR);
+		short frame = wind->frame > 0 ? wind->frame : 0;
+		short shadow = wind->frame < 0 ? 0 : wind->x_shadow;
+
+		r->g_x = wind->r.g_x + frame;
+		r->g_w = wind->r.g_w - (frame << 1) - shadow;
+		r->g_y = widg->ar.g_y;
+		r->g_h = widg->ar.g_h;
+	}
+	else
+		*r = wind->wa;
 }
 
 void

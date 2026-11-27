@@ -2059,7 +2059,7 @@ d_waframe(struct xa_window *wind, const GRECT *clip)
 		(*vapi->br_hook)(v, 1, &wa, lc);
 
 		/* fill gap between upper toolbar and wa */
-		if( (wind->active_widgets & TOOLBAR) )
+		if( (wind->active_widgets & TOOLBAR) && !(wind->dial & created_for_TOOLBAR) )
 		{
 			if( (wind->active_widgets & VSLIDE) )
 			{
