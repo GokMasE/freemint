@@ -102,6 +102,7 @@ struct cad_def
 };
 
 extern short kbd_pc_style_caps;
+extern bool kbd_async;
 extern short kbd_mpixels;
 extern short kbd_mpixels_fine;
 extern struct cad_def cad[3];

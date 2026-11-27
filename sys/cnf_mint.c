@@ -661,6 +661,7 @@ static struct parser_item parser_tab[] = {
 	{ "FDC_HIDE_B", PI_V_B, pCB_hide_b, { { 0, 0 } } },
 #ifndef NO_AKP_KEYBOARD
 	{ "KBD_AT_CAPS", PI_R_B, &kbd_pc_style_caps , { { 0, 0 } } },
+	{ "KBD_ASYNC", PI_R_B, &kbd_async, { { 0, 0 } } },
 #endif
 
 	/* These two remain the same as in the old format */
