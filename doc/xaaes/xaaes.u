@@ -340,6 +340,15 @@ an "extra" mouse-click. This is especially annoying when releasing
 the right-button after a drag-session (Thing's directory-window, for
 example), and the "extra-click" fires some unwanted action.
 
+!item [DRAG_THRESHOLD <number/pixels> (default 3)] (!nl)
+Number of pixels the mouse must move while a button is held before the
+press is treated as a drag. Normally the mouse driver waits for the double
+click time before it reports a press, to see if a second click follows.
+Once the mouse has moved more than this many pixels with the button down,
+the press is reported at once, so window moves, sliders and other drags
+start without that delay. 0 turns this off (always wait the full double
+click time). E.g. drag_threshold = 3
+
 !item [VERTICAL_WHEEL_ID (default 0)] (!nl)
 Set which mouse wheel to use for veritcal scrolling.
    E.g. vertical_wheel_id = 1
@@ -1477,6 +1486,15 @@ Mouse packet time-gap. This is the time (in 200hz timer ticks) that must
    "extra" mouse-click. This is especially annoying when releasing the
    right-button after a drag-session (as in Thing's directory window), and the
    "extra click" fires some unwanted action. E.g. mp_timegap = 5
+
+!item [DRAG_THRESHOLD <number/pixels> (default 3)] (!nl)
+   Number of pixels the mouse must move while a button is held before the
+   press is treated as a drag. Normally the mouse driver waits for the double
+   click time before it reports a press, to see if a second click follows.
+   Once the mouse has moved more than this many pixels with the button down,
+   the press is reported at once, so window moves, sliders and other drags
+   start without that delay. 0 turns this off (always wait the full double
+   click time). E.g. drag_threshold = 3
 !end_blist
  
 !end_node # Mouse Timings
