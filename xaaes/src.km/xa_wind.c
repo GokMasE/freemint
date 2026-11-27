@@ -948,10 +948,31 @@ XA_wind_set(int lock, struct xa_client *client, AESPB *pb)
 					widg2->ar.g_y -= d;
 				}
 
-				if( !w->thinwork && md == 0 )
+				/*
+				 * With the 3D work area frame (thinwork = false) the
+				 * work area starts 2 pixels below the widget rows, to
+				 * leave room for its frame. A WF_TOOLBAR toolbar is a
+				 * band right below the widget rows that covers that
+				 * margin; only the work area below the toolbar is
+				 * framed (see d_waframe()). So the toolbar goes at the
+				 * top of wind->inner.
+				 *
+				 * Set it there, instead of subtracting 2 only for the
+				 * first toolbar of a window. calc_work_area() puts
+				 * the work area back 2 pixels down on every move or
+				 * resize, so a toolbar that replaced another one was
+				 * placed 2 pixels lower: over the top of the work
+				 * area frame, with a 2 pixel strip above it that
+				 * nothing paints. Setting it from wind->inner gives
+				 * the same result in both cases. It also never moves
+				 * the toolbar above wind->inner, which subtracting 2
+				 * did for windows without a frame (frame < 0), whose
+				 * work area has no margin.
+				 */
+				if (!w->thinwork)
 				{
-					w->wa.g_y -= 2;
-					w->wa.g_h += 2;
+					w->wa.g_h += w->wa.g_y - w->inner.g_y;
+					w->wa.g_y = w->inner.g_y;
 				}
 				w->wa.g_x = w->r.g_x;
 
