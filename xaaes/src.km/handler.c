@@ -165,9 +165,9 @@ static struct xa_ftab aes_tab[220] =
 
 	/*  70 */ { XA_graf_rubberbox,         0,        DESCR("graf_rubberbox")  },
 	/*  71 */ { XA_graf_dragbox,           0,        DESCR("graf_dragbox")    },
-	/*  72 */ { NULL,                      0,        DESCR("graf_movebox")    }, /* unimplemented */
-	/*  73 */ { NULL,                      0,        DESCR("graf_growbox")    }, /* unimplemented */
-	/*  74 */ { NULL,                      0,        DESCR("graf_shrinkbox")  }, /* unimplemented */
+	/*  72 */ { XA_graf_movebox,           0,        DESCR("graf_movebox")    },
+	/*  73 */ { XA_graf_growbox,           0,        DESCR("graf_growbox")    },
+	/*  74 */ { XA_graf_shrinkbox,         0,        DESCR("graf_shrinkbox")  },
 	/*  75 */ { XA_graf_watchbox,          0,        DESCR("graf_watchbox")   },
 	/*  76 */ { XA_graf_slidebox,          0,        DESCR("graf_slidebox")   },
 	/*  77 */ { XA_graf_handle,            NOCLIENT, DESCR("graf_hand")       },
@@ -356,6 +356,9 @@ setup_handler_table(void)
 
 	aes_tab[ 70].flags |= DO_LOCKSCREEN; /* XA_GRAF_RUBBERBOX */
 	aes_tab[ 71].flags |= DO_LOCKSCREEN; /* XA_GRAF_DRAGBOX */
+	aes_tab[ 72].flags |= DO_LOCKSCREEN; /* XA_GRAF_MOVEBOX */
+	aes_tab[ 73].flags |= DO_LOCKSCREEN; /* XA_GRAF_GROWBOX */
+	aes_tab[ 74].flags |= DO_LOCKSCREEN; /* XA_GRAF_SHRINKBOX */
 	aes_tab[ 75].flags |= DO_LOCKSCREEN; /* XA_GRAF_WATCHBOX */
 	aes_tab[ 76].flags |= DO_LOCKSCREEN; /* XA_GRAF_SLIDEBOX */
 
