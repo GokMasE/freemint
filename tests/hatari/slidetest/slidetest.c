@@ -186,8 +186,8 @@ int main(void)
 
 	for (;;)
 	{
-		ev = evnt_multi(MU_KEYBD | MU_MESAG | MU_TIMER,
-				0, 0, 0,
+		ev = evnt_multi(MU_KEYBD | MU_BUTTON | MU_MESAG | MU_TIMER,
+				1, 1, 1,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				msg, 100L,
 				&mx, &my, &bs, &ks, &key, &clicks);
@@ -215,6 +215,26 @@ int main(void)
 				sliders_for_size(msg[6], msg[7]);
 				logf_("SIZED %d %d,%d,%d,%d", sized, msg[4], msg[5], msg[6], msg[7]);
 				break;
+			}
+		}
+
+		/*
+		 * Hatari ignores synthetic X key events in CI, so the host
+		 * drives the app with clicks into the work area instead: each
+		 * click runs the next command of a fixed script, the same
+		 * sequence run.sh would type.
+		 */
+		if (ev & MU_BUTTON)
+		{
+			static const char script[] = "pr" "g" "r"
+				"npr" "npr" "npr" "npr" "npr" "npr"
+				"pr" "pr" "pr" "q";
+			static int pc;
+
+			if (script[pc])
+			{
+				key = script[pc++];
+				ev |= MU_KEYBD;
 			}
 		}
 

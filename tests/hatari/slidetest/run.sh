@@ -27,10 +27,17 @@ fi
 emu_fast off
 sleep 3
 
-# lib.sh's key() sends with --window (XSendEvent), which SDL ignores.
-# Send real XTEST key events; they go to the window under the pointer,
-# and the pointer stays inside the Hatari window.
-key() { xdo key "$@"; sleep 0.3; }
+# Key events don't reach Hatari under Xvfb, so each "key" is a click in
+# the middle of the work area; sldtest.prg maps the n-th click to the
+# n-th command of its built-in script (same order as the key calls in
+# this file). The pointer is parked outside the window afterwards.
+key() {
+	local w
+	w="$(prog_log SLIDETEST | grep -o 'work=[0-9,-]*' | tail -1 | cut -d= -f2)"
+	IFS=, read KX KY KW KH <<< "$w"
+	mouse_move $((KX + KW / 2)) $((KY + KH / 2)); mouse_click 1
+	mouse_move $PARK_X $PARK_Y; sleep 0.3
+}
 LAST_SHOT=; LAST_RECT=
 
 PARK_X=630; PARK_Y=470	# keep the mouse pointer out of the shots
