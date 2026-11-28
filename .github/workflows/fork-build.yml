@@ -20,15 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cpu_target: "000",   artifact: freemint-cpu-000 }
-          - { cpu_target: "02060", artifact: freemint-cpu-02060 }
-          - { cpu_target: col,     artifact: freemint-cpu-coldfire }
-          - { cpu_target: deb,     artifact: freemint-cpu-debug }
-          - { cpu_target: prg,     artifact: usb4tos }
-          - { cpu_target: ste,     artifact: freemint-st_ste }
+          # slider test branch only: just the snapshot the Hatari test boots
           - { cpu_target: tt,      artifact: freemint-tt_falcon_clones }
-          - { cpu_target: firebee, artifact: freemint-firebee }
-          - { cpu_target: ara,     artifact: freemint-aranym }
     env:
       CROSS_TOOL: m68k-atari-mint
     steps:
