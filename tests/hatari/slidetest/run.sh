@@ -27,6 +27,12 @@ fi
 emu_fast off
 sleep 3
 
+# lib.sh's key() sends with --window (XSendEvent), which SDL ignores.
+# Send real XTEST key events; they go to the window under the pointer,
+# and the pointer stays inside the Hatari window.
+key() { xdo key "$@"; sleep 0.3; }
+LAST_SHOT=; LAST_RECT=
+
 PARK_X=630; PARK_Y=470	# keep the mouse pointer out of the shots
 lastline() { prog_log SLIDETEST | grep "^$1 " | tail -1; }
 rect_of() { echo "$1" | sed -n 's/.* rect=\([0-9,-]*\).*/\1/p'; }
